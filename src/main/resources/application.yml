@@ -1,15 +1,56 @@
+server:
+  servlet:
+    context-path: /ola-chat
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  tomcat:
+        max-http-header-size: 64KB
+
 spring:
   datasource:
-    driver-class-name: org.mariadb.jdbc.Driver
-    url: jdbc:mariadb://localhost:3306/olachat?createDatabaseIfNotExist=true
+    url: jdbc:mysql://yamabiko.proxy.rlwy.net:23769/railway
     username: root
-    password: sapassword
-
+    password: PhebhloJhVHvParqlvvXXafFkRHEDSBj
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
 
   data:
     mongodb:
-      uri: link to mongo atlats
-      database: Ola-Cluster
+      uri: mongodb+srv://mongodb:mongopassword@ola-cluster.2db1h.mongodb.net/?retryWrites=true&w=majority&appName=ola-chat-db
+      database: ola-chat
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 60000
+#    redis:
+#      host: maglev.proxy.rlwy.net
+#      port: 30825
+#      username: default
+#      password: RyTQwEZwwUnrJcNObOxamkGOSwoUnNBl
+#      ssl:
+#        enabled: true
+
+
+cloudinary:
+  cloud_name: dwip7dplu
+  api_key: 944366892271352
+  api_secret: SGhlTmcznfxn-1T0T8D2BQQOA9Q
+
+jwt:
+  signerKey: zhRPPUbgnHMtrH0Fj3reft+wa6HFXDlcwSNbTPEA3cQUdCb4aXANrlQntnH1QAYc
+  valid-duration: 3600
+  refreshable-duration: 36000
+
+
+google:
+#  client-id: 45263756239-gego0gvi3fpc5f4flplmipl410vf35hp.apps.googleusercontent.com
+  googleClientId: 714231235616-gorl6sl5fja3tgja1pfl9la9qd3b9orf.apps.googleusercontent.com
+  androidClientId: 714231235616-baubhlnvjrkfgt1k09dlchf7meiuj7s7.apps.googleusercontent.com
+facebook:
+  client-id: 1305964487147806
+  client-secret: 18270cccad0551a87941a25cf8bf56b0

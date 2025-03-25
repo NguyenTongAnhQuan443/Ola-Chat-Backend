@@ -4,7 +4,7 @@
  * Copyright (c) 2025 IUH. All rights reserved.
  */
 
-package vn.edu.iuh.fit.olachatbackend.config;
+package vn.edu.iuh.fit.olachatbackend.configs;
 /*
  * @description:
  * @author: Nguyen Thanh Nhut

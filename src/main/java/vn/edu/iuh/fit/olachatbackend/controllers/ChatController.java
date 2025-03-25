@@ -4,7 +4,7 @@
  * Copyright (c) 2025 IUH. All rights reserved.
  */
 
-package vn.edu.iuh.fit.olachatbackend.controller;
+package vn.edu.iuh.fit.olachatbackend.controllers;
 /*
  * @description:
  * @author: Nguyen Thanh Nhut
@@ -17,28 +17,33 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import vn.edu.iuh.fit.olachatbackend.entity.Message;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
+import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
 @Controller
 public class ChatController {
 
     private final SimpMessagingTemplate template;
+    private final MessageService messageService;
 
-    public ChatController(SimpMessagingTemplate template) {
+    public ChatController(SimpMessagingTemplate template, MessageService messageService) {
         this.template = template;
+        this.messageService = messageService;
     }
 
     // Public chat
     @MessageMapping("/message")
     @SendTo("/chatroom/public")
-    public Message receivePublicMessage(@Payload Message message) {
-        return message;
+    public MessageDTO receivePublicMessage(@Payload MessageDTO messageDTO) {
+        return messageDTO;
     }
 
     // Private chat
     @MessageMapping("/private-message")
-    public Message receivePrivateMessage(@Payload Message message) {
-        template.convertAndSendToUser(message.getReceiverName(), "/private", message);
-        return message;
+    public MessageDTO receivePrivateMessage(@Payload MessageDTO messageDTO) {
+        messageService.save(messageDTO);
+        System.out.println("Message from client: "+ messageDTO);
+        template.convertAndSend("/user/" + messageDTO.getConversationId() + "/private", messageDTO);
+        return messageDTO;
     }
 }
