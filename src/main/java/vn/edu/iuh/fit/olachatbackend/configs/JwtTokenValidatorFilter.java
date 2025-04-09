@@ -10,7 +10,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import vn.edu.iuh.fit.olachatbackend.services.RedisService;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Date;
@@ -18,6 +19,7 @@ import java.util.Date;
 @Component
 public class JwtTokenValidatorFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtTokenValidatorFilter.class);
     @Autowired
     private RedisService redisService;
 
@@ -37,27 +39,19 @@ public class JwtTokenValidatorFilter extends OncePerRequestFilter {
 
                 String jit = claims.getJWTID();
 
-                // ✅ 1. Check expired
                 if (claims.getExpirationTime() != null &&
                         claims.getExpirationTime().before(new Date())) {
                     throw new JwtException("Token đã hết hạn");
                 }
 
-                // ✅ 2. Check blacklist (đã logout)
+                log.info("🛡️ Kiểm tra token jti: {}", jit);
+
                 if (redisService.isTokenBlacklisted(jit)) {
-                    throw new JwtException("Token đã bị thu hồi");
+                    log.warn("🚫 Token {} đã bị thu hồi – từ chối request", jit);
+                    throw new JwtException("Access token đã bị thu hồi");
                 }
 
-                // ✅ 3. Optional: Check whitelist nếu cần (ví dụ refresh token)
-                // Nếu muốn phân biệt refresh token qua scope:
-                /*
-                String scope = (String) claims.getClaim("scope");
-                if (scope != null && scope.contains("REFRESH")) {
-                    if (!redisService.isTokenWhitelisted(jit)) {
-                        throw new JwtException("Refresh token không hợp lệ hoặc đã bị thu hồi");
-                    }
-                }
-                */
+
 
             } catch (ParseException | JwtException e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

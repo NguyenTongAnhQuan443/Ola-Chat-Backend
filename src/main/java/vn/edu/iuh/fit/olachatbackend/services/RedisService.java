@@ -14,6 +14,16 @@ public class RedisService {
     private RedisTemplate<String, String> redisTemplate;
 
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
+    private static final String ACCESS_REF_PREFIX = "access_ref:";
+
+    public void saveAccessTokenReference(String userId, String deviceId, String jti, long duration, TimeUnit unit) {
+        redisTemplate.opsForValue().set(ACCESS_REF_PREFIX + userId + ":" + deviceId, jti, duration, unit);
+    }
+
+    public String getAccessTokenJit(String userId, String deviceId) {
+        return redisTemplate.opsForValue().get(ACCESS_REF_PREFIX + userId + ":" + deviceId);
+    }
+
 
     public void saveWhitelistedToken(String jit, String token, long duration, TimeUnit timeUnit) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + jit, token, duration, timeUnit);
@@ -33,6 +43,10 @@ public class RedisService {
 
     public boolean isTokenBlacklisted(String jit) {
         return redisTemplate.hasKey("blacklist:" + jit);
+    }
+
+    public void removeAccessTokenReference(String userId, String deviceId) {
+        redisTemplate.delete("access_ref:" + userId + ":" + deviceId);
     }
 
 
