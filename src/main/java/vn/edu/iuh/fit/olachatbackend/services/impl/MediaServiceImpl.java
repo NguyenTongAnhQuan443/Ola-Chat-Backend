@@ -46,6 +46,7 @@ public class MediaServiceImpl implements MediaService {
                 .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
 
         String url = uploadResult.get("secure_url").toString();
+        String publicId = uploadResult.get("public_id").toString();
         String originalFileName = file.getOriginalFilename();
 
         // Save media metadata to the database
@@ -55,6 +56,7 @@ public class MediaServiceImpl implements MediaService {
                 .uploadedAt(LocalDateTime.now())
                 .uploadedBy(user)
                 .originalFileName(originalFileName)
+                .publicId(publicId)
                 .build();
 
         return mediaRepository.save(media);

@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface PostService {
     Post createPost(String content, String privacy, List<Media> mediaList);
+    Post getPostById(Long postId);
+    List<Post> getAllPosts();
 }

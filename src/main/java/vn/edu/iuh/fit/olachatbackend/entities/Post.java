@@ -1,5 +1,6 @@
 package vn.edu.iuh.fit.olachatbackend.entities;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
@@ -27,7 +28,8 @@ public class Post {
     private String content;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Media> attachments; // Optional: Can be null or empty
+    @JsonManagedReference
+    private List<Media> attachments;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "privacy", nullable = false)

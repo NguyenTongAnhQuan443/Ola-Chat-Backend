@@ -36,15 +36,34 @@ public class PostServiceImpl implements PostService {
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Create and save the post
+        // Create the post
         Post post = Post.builder()
                 .content(content)
                 .attachments(mediaList)
                 .privacy(Privacy.valueOf(privacy))
-                .createdBy(user) // Set the createdBy field
+                .createdBy(user)
                 .createdAt(LocalDateTime.now())
                 .build();
 
+        // Associate each media with the post
+        if (mediaList != null) {
+            for (Media media : mediaList) {
+                media.setPost(post);
+            }
+        }
+
+        // Save the post
         return postRepository.save(post);
+    }
+
+    @Override
+    public Post getPostById(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+    }
+
+    @Override
+    public List<Post> getAllPosts() {
+        return postRepository.findAll();
     }
 }

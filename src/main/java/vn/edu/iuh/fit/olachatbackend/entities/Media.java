@@ -1,6 +1,7 @@
 // File: src/main/java/vn/edu/iuh/fit/olachatbackend/entities/Media.java
 package vn.edu.iuh.fit.olachatbackend.entities;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,5 +37,9 @@ public class Media {
 
     @ManyToOne
     @JoinColumn(name = "post_id")
+    @JsonBackReference
     private Post post;
+
+    @Column(name = "public_id", nullable = false)
+    private String publicId;
 }
