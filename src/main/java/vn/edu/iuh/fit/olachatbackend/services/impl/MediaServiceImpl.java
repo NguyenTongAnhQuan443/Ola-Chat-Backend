@@ -14,6 +14,7 @@ import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -60,5 +61,18 @@ public class MediaServiceImpl implements MediaService {
                 .build();
 
         return mediaRepository.save(media);
+    }
+
+    @Override
+    public void deleteMediaFromCloudinary(List<Media> mediaList) throws IOException {
+        if (mediaList != null && !mediaList.isEmpty()) {
+            for (Media media : mediaList) {
+                // Delete the file from Cloudinary using its publicId
+                cloudinary.uploader().destroy(media.getPublicId(), ObjectUtils.emptyMap());
+
+                // Remove the media record from the database
+                mediaRepository.delete(media);
+            }
+        }
     }
 }

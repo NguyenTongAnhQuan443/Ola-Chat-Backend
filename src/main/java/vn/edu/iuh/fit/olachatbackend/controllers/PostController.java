@@ -58,4 +58,11 @@ public class PostController {
         var postResponses = postMapper.toPostResponseList(posts);
         return ResponseEntity.ok(postResponses);
     }
+
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<List<PostResponse>> deletePostAndReturnRemaining(@PathVariable Long postId) throws IOException {
+        List<Post> remainingPosts = postService.deletePostByIdAndReturnRemaining(postId);
+        List<PostResponse> postResponses = postMapper.toPostResponseList(remainingPosts);
+        return ResponseEntity.ok(postResponses);
+    }
 }
