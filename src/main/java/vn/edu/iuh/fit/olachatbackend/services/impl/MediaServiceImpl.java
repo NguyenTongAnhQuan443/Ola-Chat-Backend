@@ -67,8 +67,13 @@ public class MediaServiceImpl implements MediaService {
     public void deleteMediaFromCloudinary(List<Media> mediaList) throws IOException {
         if (mediaList != null && !mediaList.isEmpty()) {
             for (Media media : mediaList) {
-                // Delete the file from Cloudinary using its publicId
-                cloudinary.uploader().destroy(media.getPublicId(), ObjectUtils.emptyMap());
+                // Determine the resource type based on the file type
+                String resourceType = media.getFileType() != null && media.getFileType().toLowerCase().contains("video")
+                        ? "video"
+                        : "image";
+
+                // Delete the file from Cloudinary using its publicId and resourceType
+                cloudinary.uploader().destroy(media.getPublicId(), ObjectUtils.asMap("resource_type", resourceType));
 
                 // Remove the media record from the database
                 mediaRepository.delete(media);
