@@ -13,6 +13,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  */
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FriendRequestServiceImpl implements FriendRequestService {
@@ -64,23 +66,11 @@ public class FriendRequestServiceImpl implements FriendRequestService {
             throw new ConflicException("Hai người đã là bạn bè.");
         }
 
-        // Find the device token associated with the receiver
-        DeviceToken deviceToken = deviceTokenRepository.findByUserId(receiverId);
-
-        // If a device token is found, send the notification
-        if (deviceToken != null) {
-            NotificationRequest notificationRequest = NotificationRequest.builder()
-                    .title("Lời mời kết bạn")
-                    .body("Bạn có lời mời kết bạn từ " + sender.getDisplayName())
-                    .token(deviceToken.getToken())
-                    .type(NotificationType.FRIEND_REQUEST)
-                    .senderId(sender.getId())
-                    .receiverId(receiverId)
-                    .build();
-            notificationService.sendNotification(notificationRequest);
-        } else {
-            // Throw a custom exception if no token is found
-            throw new NotFoundException("Không tìm thấy token cho user: " + receiverId);
+        try {
+            notificationService.notifyUser(receiverId, "Lời mời kết bạn", "Bạn có lời mời kết bạn từ " + sender.getDisplayName(),
+                    NotificationType.FRIEND_REQUEST, sender.getId());
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi thông báo {}", e.getMessage());
         }
 
         FriendRequest friendRequest = new FriendRequest();

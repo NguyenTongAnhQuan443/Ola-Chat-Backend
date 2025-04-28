@@ -13,14 +13,9 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
  */
 
 import org.springframework.web.bind.annotation.*;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.Message;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
-
-import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -32,7 +27,7 @@ public class MessageController {
     }
 
     @PostMapping
-    public MessageDTO createMessage(@RequestBody MessageDTO messageDTO) {
+    public MessageRequest createMessage(@RequestBody MessageRequest messageDTO) {
         return messageService.save(messageDTO);
     }
 

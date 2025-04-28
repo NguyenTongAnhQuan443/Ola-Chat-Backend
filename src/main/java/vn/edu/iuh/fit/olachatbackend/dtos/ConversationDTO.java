@@ -33,4 +33,7 @@ public class ConversationDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<String> userIds;
+    private List<String> moderatorIds;
+    private String adminId;
+    private String backgroundUrl;
 }

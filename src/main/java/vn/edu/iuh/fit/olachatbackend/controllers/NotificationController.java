@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.NotificationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.NotificationPageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.RegisterDeviceRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 
@@ -60,8 +61,8 @@ public class NotificationController {
     }
 
     @PostMapping("/register-device")
-    public ResponseEntity<MessageResponse<Void>> registerDevice(@RequestParam String userId, @RequestParam String token) {
-        notificationService.registerDevice(userId, token);
+    public ResponseEntity<MessageResponse<Void>> registerDevice(@RequestBody RegisterDeviceRequest request) {
+        notificationService.registerDevice(request);
 
         MessageResponse<Void> response = MessageResponse.<Void>builder()
                 .message("Đã đăng ký thiết bị thành công.")

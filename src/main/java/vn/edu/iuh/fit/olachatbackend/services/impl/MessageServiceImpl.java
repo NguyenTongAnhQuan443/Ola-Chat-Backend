@@ -14,8 +14,10 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageResponseDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.SenderInfoResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
@@ -24,6 +26,7 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
 
@@ -34,7 +37,6 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,9 +45,10 @@ public class MessageServiceImpl implements MessageService {
     private final MongoTemplate mongoTemplate;
     private final ParticipantRepository participantRepository;
     private final ConversationRepository conversationRepository;
+    private final UserRepository userRepository;
 
     @Override
-    public MessageDTO save(MessageDTO messageDTO) {
+    public MessageRequest save(MessageRequest messageDTO) {
         Message message = Message.builder()
                 .senderId(messageDTO.getSenderId())
                 .conversationId(new ObjectId(messageDTO.getConversationId()))
@@ -77,25 +80,36 @@ public class MessageServiceImpl implements MessageService {
         mongoTemplate.updateFirst(query, update, Conversation.class);
     }
 
-    public List<MessageDTO> getMessagesByConversationId(String conversationId) {
+    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId) {
         List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId));
 
-        return messages.stream().map(msg -> MessageDTO.builder()
-                .id(msg.getId().toHexString())
-                .senderId(msg.getSenderId())
-                .conversationId(msg.getConversationId().toHexString())
-                .content(msg.getContent())
-                .type(msg.getType())
-                .mediaUrls(msg.getMediaUrls())
-                .status(msg.getStatus())
-                .deliveryStatus(msg.getDeliveryStatus())
-                .readStatus(msg.getReadStatus())
-                .createdAt(msg.getCreatedAt())
-                .recalled(msg.isRecalled())
-                .build()).toList();
+        return messages.stream()
+                .map(message -> {
+                    SenderInfoResponse senderInfo = toSenderInfo(message.getSenderId());
+                    return MessageResponseDTO.builder()
+                            .id(message.getId().toHexString())
+                            .sender(senderInfo)
+                            .conversationId(message.getConversationId().toHexString())
+                            .content(message.getContent())
+                            .type(message.getType())
+                            .mediaUrls(message.getMediaUrls())
+                            .status(message.getStatus())
+                            .deliveryStatus(message.getDeliveryStatus())
+                            .readStatus(message.getReadStatus())
+                            .createdAt(message.getCreatedAt())
+                            .recalled(message.isRecalled())
+                            .build();
+                })
+                .toList();
     }
 
-    public MessageDTO recallMessage(String messageId, String senderId) {
+    private SenderInfoResponse toSenderInfo(String senderId) {
+        User user = userRepository.findById(senderId).orElse(null);
+        if (user == null) return null;
+        return new SenderInfoResponse(user.getId(), user.getDisplayName(), user.getAvatar());
+    }
+
+    public MessageRequest recallMessage(String messageId, String senderId) {
         System.out.println("Mess" + messageId);
 //         Kiểm tra định dạng Message ID
         if (messageId == null || !messageId.matches("[0-9a-fA-F]{24}")) {
@@ -123,7 +137,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
 //         Trả về MessageDTO với trạng thái tin nhắn đã thu hồi
-        return MessageDTO.builder()
+        return MessageRequest.builder()
                 .id(message.getId().toHexString())
                 .senderId(message.getSenderId())
                 .conversationId(message.getConversationId().toHexString())

@@ -22,7 +22,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GroupRequest {
-    private String creatorId;
     private String name;
     private String avatar;
     private List<String> userIds;

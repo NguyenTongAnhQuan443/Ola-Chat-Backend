@@ -37,4 +37,5 @@ public class Conversation {
     private LastMessage lastMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String backgroundUrl;
 }
