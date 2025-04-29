@@ -29,6 +29,7 @@ import vn.edu.iuh.fit.olachatbackend.repositories.DeviceTokenRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.FriendRequestRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.FriendRequestService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 
@@ -44,8 +45,9 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     private final FriendRequestRepository friendRequestRepository;
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
-    private final DeviceTokenRepository deviceTokenRepository;
+    private final ConversationService conversationService;
     private final NotificationService notificationService;
+
 
     @Override
     public FriendRequestDTO sendFriendRequest(FriendRequestDTO friendRequestDTO) {
@@ -159,6 +161,18 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
         friendRequestRepository.save(friendRequest);
         friendRepository.save(friend);
+
+        // Create conversation
+//        Conversation conversation = Conversation.builder()
+//                .name("Cuộc trò chuyện của " + friendRequest.getSender().getDisplayName() + " và " + )
+//                .avatar(conversationDTO.getAvatar())
+//                .type(conversationDTO.getType())
+//                .lastMessage(conversationDTO.getLastMessage())
+//                .createdAt(LocalDateTime.now())
+//                .updatedAt(LocalDateTime.now())
+//                .build();
+//
+//        conversationService.createConversation(conversation)
     }
 
     @Override

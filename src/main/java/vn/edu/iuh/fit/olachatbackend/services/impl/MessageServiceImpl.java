@@ -14,8 +14,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageResponseDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.SenderInfoResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
@@ -48,7 +47,7 @@ public class MessageServiceImpl implements MessageService {
     private final UserRepository userRepository;
 
     @Override
-    public MessageRequest save(MessageRequest messageDTO) {
+    public MessageDTO save(MessageDTO messageDTO) {
         Message message = Message.builder()
                 .senderId(messageDTO.getSenderId())
                 .conversationId(new ObjectId(messageDTO.getConversationId()))
@@ -80,15 +79,14 @@ public class MessageServiceImpl implements MessageService {
         mongoTemplate.updateFirst(query, update, Conversation.class);
     }
 
-    public List<MessageResponseDTO> getMessagesByConversationId(String conversationId) {
+    public List<MessageDTO> getMessagesByConversationId(String conversationId) {
         List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId));
 
         return messages.stream()
                 .map(message -> {
-                    SenderInfoResponse senderInfo = toSenderInfo(message.getSenderId());
-                    return MessageResponseDTO.builder()
+                    return MessageDTO.builder()
                             .id(message.getId().toHexString())
-                            .sender(senderInfo)
+                            .senderId(message.getSenderId())
                             .conversationId(message.getConversationId().toHexString())
                             .content(message.getContent())
                             .type(message.getType())
@@ -109,7 +107,7 @@ public class MessageServiceImpl implements MessageService {
         return new SenderInfoResponse(user.getId(), user.getDisplayName(), user.getAvatar());
     }
 
-    public MessageRequest recallMessage(String messageId, String senderId) {
+    public MessageDTO recallMessage(String messageId, String senderId) {
         System.out.println("Mess" + messageId);
 //         Kiểm tra định dạng Message ID
         if (messageId == null || !messageId.matches("[0-9a-fA-F]{24}")) {
@@ -137,7 +135,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
 //         Trả về MessageDTO với trạng thái tin nhắn đã thu hồi
-        return MessageRequest.builder()
+        return MessageDTO.builder()
                 .id(message.getId().toHexString())
                 .senderId(message.getSenderId())
                 .conversationId(message.getConversationId().toHexString())
