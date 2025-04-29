@@ -1,6 +1,7 @@
 package vn.edu.iuh.fit.olachatbackend.dtos.responses;
 
 import lombok.Data;
+import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
@@ -18,4 +19,5 @@ public class PostResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<User> likedUsers;
+    private List<Comment> comments;
 }

@@ -5,18 +5,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.Like;
-import vn.edu.iuh.fit.olachatbackend.entities.Media;
-import vn.edu.iuh.fit.olachatbackend.entities.Post;
-import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.PostRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
@@ -33,14 +27,16 @@ public class PostServiceImpl implements PostService {
     private final LikeRepository likeRepository;
     private final PostMapper postMapper;
     private final FriendRepository friendRepository;
+    private final CommentRepository commentRepository;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
         this.likeRepository = likeRepository;
         this.postMapper = postMapper;
         this.friendRepository = friendRepository;
+        this.commentRepository = commentRepository;
     }
 
     @Override
@@ -235,6 +231,44 @@ public class PostServiceImpl implements PostService {
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setLikedUsers(likedUsers);
+
+        return postResponse;
+    }
+    @Override
+    public PostResponse addCommentToPost(Long postId, String content) {
+        // Lấy bài đăng từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền truy cập dựa trên Privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to comment on this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser) && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to comment on this post");
+        }
+
+        // Tạo bình luận mới
+        Comment comment = Comment.builder()
+                .post(post)
+                .commentedBy(currentUser)
+                .content(content)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // Lưu bình luận vào DB
+        commentRepository.save(comment);
+
+        // Lấy danh sách bình luận của bài đăng
+        List<Comment> comments = commentRepository.findAllByPost(post);
+
+        // Map bài đăng sang PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setComments(comments);
 
         return postResponse;
     }

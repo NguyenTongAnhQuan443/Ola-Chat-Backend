@@ -16,6 +16,7 @@ public interface PostMapper {
     PostMapper INSTANCE = Mappers.getMapper(PostMapper.class);
 
     @Mapping(target = "likedUsers", expression = "java(mapLikedUsers(post.getLikes()))")
+    @Mapping(target = "comments", source = "comments")
     PostResponse toPostResponse(Post post);
 
     List<PostResponse> toPostResponseList(List<Post> posts);

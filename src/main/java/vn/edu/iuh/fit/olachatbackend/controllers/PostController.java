@@ -97,9 +97,18 @@ public class PostController {
         PostResponse postResponse = postService.likePost(postId);
         return ResponseEntity.ok(postResponse);
     }
+
     @DeleteMapping("/{postId}/like")
     public ResponseEntity<PostResponse> toggleLikePost(@PathVariable Long postId) {
         PostResponse postResponse = postService.toggleLikePost(postId);
+        return ResponseEntity.ok(postResponse);
+    }
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<PostResponse> addCommentToPost(
+            @PathVariable Long postId,
+            @RequestParam("content") String content) {
+        PostResponse postResponse = postService.addCommentToPost(postId, content);
         return ResponseEntity.ok(postResponse);
     }
 }
