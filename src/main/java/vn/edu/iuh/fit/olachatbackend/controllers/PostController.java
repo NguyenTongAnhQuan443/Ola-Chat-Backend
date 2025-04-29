@@ -65,4 +65,16 @@ public class PostController {
         List<PostResponse> postResponses = postMapper.toPostResponseList(remainingPosts);
         return ResponseEntity.ok(postResponses);
     }
+
+    @PutMapping(value = "/{postId}", consumes = "multipart/form-data")
+    public ResponseEntity<PostResponse> updatePost(
+            @PathVariable Long postId,
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "filesToDelete", required = false) List<String> filesToDelete,
+            @RequestParam(value = "newFiles", required = false) List<MultipartFile> newFiles) throws IOException {
+
+        Post updatedPost = postService.updatePost(postId, content, filesToDelete, newFiles);
+        PostResponse postResponse = postMapper.toPostResponse(updatedPost);
+        return ResponseEntity.ok(postResponse);
+    }
 }

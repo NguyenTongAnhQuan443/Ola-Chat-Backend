@@ -3,6 +3,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
@@ -16,6 +17,7 @@ import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -88,5 +90,44 @@ public class PostServiceImpl implements PostService {
 
         // Fetch the remaining posts of the user
         return postRepository.findByCreatedBy(post.getCreatedBy());
+    }
+
+    @Override
+    public Post updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException {
+        // Lấy bài đăng từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Cập nhật content nếu có
+        if (content != null && !content.isEmpty()) {
+            post.setContent(content);
+        }
+
+        // Xóa media nếu có filesToDelete
+        if (filesToDelete != null && !filesToDelete.isEmpty()) {
+            List<Media> mediaToDelete = post.getAttachments().stream()
+                    .filter(media -> filesToDelete.contains(media.getPublicId()))
+                    .toList();
+
+            mediaService.deleteMediaFromCloudinary(mediaToDelete);
+            post.getAttachments().removeAll(mediaToDelete);
+        }
+
+        // Thêm media mới nếu có newFiles
+        if (newFiles != null && !newFiles.isEmpty()) {
+            List<Media> newMedia = new ArrayList<>();
+            for (MultipartFile file : newFiles) {
+                Media media = mediaService.uploadMedia(file);
+                media.setPost(post);
+                newMedia.add(media);
+            }
+            post.getAttachments().addAll(newMedia);
+        }
+
+        // Cập nhật updatedAt
+        post.setUpdatedAt(LocalDateTime.now());
+
+        // Lưu bài đăng
+        return postRepository.save(post);
     }
 }
