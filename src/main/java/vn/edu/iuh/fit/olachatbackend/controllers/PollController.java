@@ -22,7 +22,10 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.VoteRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollOptionResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollResultsResponse;
 import vn.edu.iuh.fit.olachatbackend.services.PollService;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/polls")
@@ -49,6 +52,34 @@ class PollController {
     public ResponseEntity<MessageResponse<String>> vote(@PathVariable String pollId, @RequestBody VoteRequest request) {
         pollService.vote(pollId, request);
         MessageResponse<String> response = new MessageResponse<>(200, "Vote đã được ghi nhận thành công", true, null);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{pollId}/results")
+    public ResponseEntity<MessageResponse<PollResultsResponse>> getPollResults(@PathVariable String pollId) {
+        PollResultsResponse results = pollService.getPollResults(pollId);
+        MessageResponse<PollResultsResponse> response = new MessageResponse<>(200, "Lấy kết quả bình chọn thành công", true, results);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{pollId}/pin")
+    public ResponseEntity<MessageResponse<PollResponse>> pinPoll(@PathVariable String pollId) {
+        PollResponse pinnedPoll = pollService.pinPoll(pollId);
+        MessageResponse<PollResponse> response = new MessageResponse<>(200, "Đã ghim bình chọn thành công", true, pinnedPoll);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{pollId}/unpin")
+    public ResponseEntity<MessageResponse<PollResponse>> unpinPoll(@PathVariable String pollId) {
+        PollResponse unpinnedPoll = pollService.unpinPoll(pollId);
+        MessageResponse<PollResponse> response = new MessageResponse<>(200, "Đã bỏ ghim bình chọn", true, unpinnedPoll);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{pollId}/lock")
+    public ResponseEntity<MessageResponse<PollResponse>> lockPoll(@PathVariable String pollId) {
+        PollResponse lockedPoll = pollService.lockPoll(pollId);
+        MessageResponse<PollResponse> response = new MessageResponse<>(200, "Poll locked successfully", true, lockedPoll);
         return ResponseEntity.ok(response);
     }
 }

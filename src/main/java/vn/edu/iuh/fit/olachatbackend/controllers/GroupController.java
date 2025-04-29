@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.AddMemberRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangeBackgroundRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupUpdateRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
@@ -127,6 +128,13 @@ public class GroupController {
     public ResponseEntity<MessageResponse<Object>> unmuteConversation(@PathVariable String groupId) {
         groupService.unmuteConversation(new ObjectId(groupId));
         return ResponseEntity.ok(new MessageResponse<>(200, "Đã bật lại thông báo nhóm", true));
+    }
+
+    @PatchMapping("/{groupId}/change-background")
+    public ResponseEntity<MessageResponse<Void>> changeBackground(@PathVariable String groupId,
+                                                                  @RequestBody ChangeBackgroundRequest request) {
+        groupService.changeBackground(new ObjectId(groupId), request);
+        return ResponseEntity.ok(new MessageResponse<>(200, "Thay đổi background nhóm thành công", true));
     }
 
 

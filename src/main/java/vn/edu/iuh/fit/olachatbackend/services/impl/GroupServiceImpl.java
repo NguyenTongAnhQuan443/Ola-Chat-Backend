@@ -19,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.AddMemberRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangeBackgroundRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupUpdateRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
@@ -310,6 +311,23 @@ public class GroupServiceImpl implements GroupService {
         Participant participant = findParticipantInGroup(groupId, user.getId());
         participant.setMuted(false);
         participantRepository.save(participant);
+    }
+
+    @Override
+    public void changeBackground(ObjectId groupId, ChangeBackgroundRequest request) {
+        User user = getCurrentUser();
+
+        Conversation group = findGroupById(groupId);
+
+        Participant requester = findParticipantInGroup(groupId, user.getId());
+
+        // Validate backgroundUrl
+        if (request.getBackgroundUrl() == null || request.getBackgroundUrl().trim().isEmpty()) {
+            throw new BadRequestException("Background không được để trống");
+        }
+
+        group.setBackgroundUrl(request.getBackgroundUrl().trim());
+        conversationRepository.save(group);
     }
 
     /**

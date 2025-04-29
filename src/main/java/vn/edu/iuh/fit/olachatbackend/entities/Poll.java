@@ -36,4 +36,5 @@ public class Poll {
     private boolean allowAddOptions;
     private boolean hideResultsUntilVoted;
     private boolean hideVoters;
+    private boolean isLocked;
 }

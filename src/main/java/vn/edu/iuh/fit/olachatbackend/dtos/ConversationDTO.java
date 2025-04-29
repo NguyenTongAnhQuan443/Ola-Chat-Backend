@@ -35,4 +35,5 @@ public class ConversationDTO {
     private List<String> userIds;
     private List<String> moderatorIds;
     private String adminId;
+    private String backgroundUrl;
 }

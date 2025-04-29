@@ -15,6 +15,7 @@ package vn.edu.iuh.fit.olachatbackend.services;
 import org.bson.types.ObjectId;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.AddMemberRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangeBackgroundRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupUpdateRequest;
 
 import java.util.List;
@@ -41,4 +42,6 @@ public interface GroupService {
     void muteConversation(ObjectId objectId);
 
     void unmuteConversation(ObjectId objectId);
+
+    void changeBackground(ObjectId groupId, ChangeBackgroundRequest request);
 }

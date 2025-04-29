@@ -31,5 +31,6 @@ public class PollResponse {
     private boolean allowAddOptions;
     private boolean hideResultsUntilVoted;
     private boolean hideVoters;
+    private boolean isLocked;
     private List<PollOptionResponse> options;
 }

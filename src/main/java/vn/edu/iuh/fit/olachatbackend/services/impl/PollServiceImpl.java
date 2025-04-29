@@ -19,9 +19,7 @@ import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.AddOptionRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.CreatePollRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.VoteRequest;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollOptionResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PollResultsResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -30,7 +28,9 @@ import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.PollService;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +47,190 @@ public class PollServiceImpl implements PollService {
 
     @Override
     public PollResponse createPoll(CreatePollRequest request) {
+        validateCreatePollRequest(request);
+
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(request.getGroupId()), user.getId());
+
+        // Save poll
+        Poll poll = pollMapper.toPoll(request);
+        poll.setCreatorId(user.getId());
+        poll.setLocked(false);
+        poll = pollRepository.save(poll);
+
+        // Save options
+        Poll finalPoll = poll;
+        List<PollOption> options = request.getOptions().stream()
+                .map(optionText -> {
+                    PollOption option = new PollOption();
+                    option.setPollId(finalPoll.getId());
+                    option.setOptionText(optionText);
+                    return pollOptionRepository.save(option);
+                })
+                .toList();
+
+        // Create response
+        PollResponse response = pollMapper.toPollResponse(poll);
+        response.setOptions(options.stream().map(pollMapper::toPollOptionResponse).collect(Collectors.toList()));
+        return response;
+    }
+
+    @Override
+    public PollOptionResponse addOption(String pollId, AddOptionRequest request) {
+        validatePollId(pollId);
+
+        Poll poll = getPollById(pollId);
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(poll.getGroupId()), user.getId());
+
+        // Check poll is locked
+        if (poll.isLocked()) {
+            throw new BadRequestException("Bình chọn đã bị khóa, không thể thêm tùy chọn");
+        }
+
+        // Check role
+        if (!poll.isAllowAddOptions()) {
+            throw new BadRequestException("Không được phép thêm tùy chọn cho bình chọn này");
+        }
+
+        // Check poll expiration
+        validatePollNotExpired(poll);
+
+        // Check option
+        if (request.getOptionText() == null || request.getOptionText().trim().isEmpty()) {
+            throw new BadRequestException("Tùy chọn không được để trống");
+        }
+
+        // Check for duplicate content
+        checkDuplicateOption(pollId, request.getOptionText());
+
+        // Save new option
+        PollOption option = pollMapper.toPollOption(request, pollId);
+        option = pollOptionRepository.save(option);
+
+        return pollMapper.toPollOptionResponse(option);
+    }
+
+    @Override
+    public void vote(String pollId, VoteRequest request) {
+        validatePollId(pollId);
+
+        Poll poll = getPollById(pollId);
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(poll.getGroupId()), user.getId());
+
+        // Check poll status
+        validatePollNotExpired(poll);
+        validatePollNotLocked(poll);
+
+        // Check the list option Ids are not empty
+        if (request.getOptionIds() == null || request.getOptionIds().isEmpty()) {
+            throw new BadRequestException("Ít nhất một tùy chọn phải được chọn");
+        }
+
+        // Check multiple options
+        if (!poll.isAllowMultipleChoices() && request.getOptionIds().size() > 1) {
+            throw new BadRequestException("Không được phép lựa chọn nhiều cho bình chọn này");
+        }
+
+        // Check and manage existing votes
+        if (!poll.isAllowMultipleChoices()) {
+            voteRepository.deleteAll(voteRepository.findByPollIdAndUserId(pollId, user.getId()));
+        }
+
+        // Validate option IDs
+        validateOptionIds(pollId, request.getOptionIds());
+
+        // Save votes
+        request.getOptionIds().forEach(optionId -> {
+            Vote vote = new Vote();
+            vote.setPollId(pollId);
+            vote.setUserId(user.getId());
+            vote.setOptionId(optionId);
+            voteRepository.save(vote);
+        });
+    }
+
+    @Override
+    public PollResultsResponse getPollResults(String pollId) {
+        validatePollId(pollId);
+
+        Poll poll = getPollById(pollId);
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(poll.getGroupId()), user.getId());
+
+        // Check view role (if hide results until vote)
+        if (poll.isHideResultsUntilVoted()) {
+            List<Vote> userVotes = voteRepository.findByPollIdAndUserId(pollId, user.getId());
+            if (userVotes.isEmpty()) {
+                throw new BadRequestException("Kết quả sẽ được ẩn cho đến khi bạn bỏ phiếu!");
+            }
+        }
+
+        // Get data to create response
+        List<PollOption> options = pollOptionRepository.findByPollId(pollId);
+        List<Vote> votes = voteRepository.findByPollId(pollId);
+        Map<String, Integer> voteCounts = votes.stream()
+                .collect(Collectors.groupingBy(Vote::getOptionId, Collectors.summingInt(v -> 1)));
+
+        // Build response
+        PollResultsResponse results = new PollResultsResponse();
+        PollResponse pollResponse = pollMapper.toPollResponse(poll);
+        pollResponse.setOptions(options.stream().map(pollMapper::toPollOptionResponse).collect(Collectors.toList()));
+
+        results.setPoll(pollResponse);
+        results.setOptions(options.stream()
+                .map(opt -> new PollOptionResult(pollMapper.toPollOptionResponse(opt), voteCounts.getOrDefault(opt.getId(), 0)))
+                .collect(Collectors.toList()));
+
+        results.setVoters(poll.isHideVoters() ? new ArrayList<>() :
+                votes.stream()
+                        .map(vote -> new Voter(vote.getUserId(), vote.getOptionId()))
+                        .collect(Collectors.toList()));
+
+        return results;
+    }
+
+    @Override
+    public PollResponse pinPoll(String pollId) {
+        return updatePollPinStatus(pollId, true);
+    }
+
+    @Override
+    public PollResponse unpinPoll(String pollId) {
+        return updatePollPinStatus(pollId, false);
+    }
+
+    @Override
+    public PollResponse lockPoll(String pollId) {
+        validatePollId(pollId);
+
+        Poll poll = getPollById(pollId);
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(poll.getGroupId()), user.getId());
+
+        // Check poll locked
+        if (poll.isLocked()) {
+            throw new BadRequestException("Bình chọn đã bị khóa từ trước");
+        }
+
+        // Save poll
+        poll.setLocked(true);
+        poll = pollRepository.save(poll);
+
+        return buildPollResponse(poll);
+    }
+
+    // Helper methods
+    private User getCurrentUser() {
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+
+        return userRepository.findByUsername(name)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
+    }
+
+    private void validateCreatePollRequest(CreatePollRequest request) {
         // Check question
         if (request.getQuestion() == null || request.getQuestion().trim().isEmpty()) {
             throw new BadRequestException("Câu hỏi không được để trống");
@@ -64,7 +248,7 @@ public class PollServiceImpl implements PollService {
             }
         }
 
-        // Check groupId and creatorId
+        // Check groupId
         if (request.getGroupId() == null || request.getGroupId().isEmpty()) {
             throw new BadRequestException("Group id không được để trống");
         }
@@ -75,148 +259,82 @@ public class PollServiceImpl implements PollService {
         }
 
         // Check group exists
-        Conversation group = conversationRepository.findById(new ObjectId(request.getGroupId()))
+        conversationRepository.findById(new ObjectId(request.getGroupId()))
                 .orElseThrow(() -> new BadRequestException("Nhóm không tồn tại"));
+    }
 
-        // Get user info from JWT (userId)
-        User user = getCurrentUser();
+    private void validatePollId(String pollId) {
+        if (pollId == null || pollId.trim().isEmpty()) {
+            throw new BadRequestException("Poll ID không được để trống");
+        }
+    }
 
-        // Check user if user in group
-        boolean isMember = participantRepository.existsByConversationIdAndUserId(new ObjectId(request.getGroupId()), user.getId());
+    private Poll getPollById(String pollId) {
+        return pollRepository.findById(pollId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy bình chọn"));
+    }
+
+    private void validateGroupMembership(ObjectId groupId, String userId) {
+        boolean isMember = participantRepository.existsByConversationIdAndUserId(groupId, userId);
         if (!isMember) {
             throw new BadRequestException("Bạn không phải là thành viên của nhóm này");
         }
-
-        // Save poll
-        Poll poll = pollMapper.toPoll(request);
-        poll.setCreatorId(user.getId());
-        poll = pollRepository.save(poll);
-
-        // Save option
-        for (String optionText : request.getOptions()) {
-            PollOption option = new PollOption();
-            option.setPollId(poll.getId());
-            option.setOptionText(optionText);
-            pollOptionRepository.save(option);
-        }
-
-        // Create response
-        PollResponse response = pollMapper.toPollResponse(poll);
-        List<PollOption> options = pollOptionRepository.findByPollId(poll.getId());
-        response.setOptions(options.stream().map(pollMapper::toPollOptionResponse).collect(Collectors.toList()));
-        return response;
     }
 
-    @Override
-    public PollOptionResponse addOption(String pollId, AddOptionRequest request) {
-        // Check pollId
-        if (pollId == null) {
-            throw new BadRequestException("Poll ID không được để trống");
-        }
-
-        // Check poll exists
-        Poll poll = pollRepository.findById(pollId)
-                .orElseThrow(() -> new BadRequestException("Không tìm thấy bình chọn"));
-
-        // Check role
-        if (!poll.isAllowAddOptions()) {
-            throw new BadRequestException("Không được phép thêm tùy chọn cho bình chọn này");
-        }
-
-        // Check poll expiration
+    private void validatePollNotExpired(Poll poll) {
         if (poll.getDeadline() != null && poll.getDeadline().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Bình chọn đã hết hạn, không thể thêm tùy chọn");
+            throw new BadRequestException("Bình chọn đã hết hạn");
         }
-
-        // Check option
-        if (request.getOptionText() == null || request.getOptionText().trim().isEmpty()) {
-            throw new BadRequestException("Tùy chọn không được để trống");
-        }
-
-        // Save new option
-        PollOption option = pollMapper.toPollOption(request, pollId);
-        option = pollOptionRepository.save(option);
-
-        return pollMapper.toPollOptionResponse(option);
     }
 
-    @Override
-    public void vote(String pollId, VoteRequest request) {
-        User user = getCurrentUser();
-
-        // Check pollId
-        if (pollId == null) {
-            throw new BadRequestException("Poll ID không được để trống");
+    private void validatePollNotLocked(Poll poll) {
+        if (poll.isLocked()) {
+            throw new BadRequestException("Bình chọn đã bị khóa");
         }
+    }
 
-        Poll poll = pollRepository.findById(pollId)
-                .orElseThrow(() -> new BadRequestException("Không tìm thấy bình chọn"));
-
-        // Check exists in group
-        boolean isMember = participantRepository.existsByConversationIdAndUserId(new ObjectId(poll.getGroupId()), user.getId());
-        if (!isMember) {
-            throw new BadRequestException("Bạn không phải là thành viên của nhóm này");
-        }
-
-        // Check the list option Ids are not empty
-        if (request.getOptionIds() == null || request.getOptionIds().isEmpty()) {
-            throw new BadRequestException("Ít nhất một tùy chọn phải được chọn");
-        }
-
-        // Check poll expiration
-        if (poll.getDeadline() != null && poll.getDeadline().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Bình chọn đã hết hạn, không thể bỏ phiếu");
-        }
-
-        // Check multiple options
-        if (!poll.isAllowMultipleChoices() && request.getOptionIds().size() > 1) {
-            throw new BadRequestException("Không được phép lựa chọn nhiều cho bình chọn này");
-        }
-
-        // Check user votes are not accepted (if multiple selection is not allowed)
-        if (!poll.isAllowMultipleChoices()) {
-            List<Vote> existingVotes = voteRepository.findByPollIdAndUserId(pollId, user.getId());
-            if (!existingVotes.isEmpty()) {
-                // If voted, delete previous vote
-                voteRepository.deleteAll(existingVotes);
+    private void checkDuplicateOption(String pollId, String optionText) {
+        String newOptionNormalized = optionText.trim().toLowerCase();
+        for (PollOption existingOption : pollOptionRepository.findByPollId(pollId)) {
+            String existingOptionNormalized = existingOption.getOptionText().trim().toLowerCase();
+            if (existingOptionNormalized.equals(newOptionNormalized)) {
+                throw new BadRequestException("Tùy chọn đã tồn tại");
             }
         }
+    }
 
-        // Check if optionId exists in poll
+    private void validateOptionIds(String pollId, List<String> optionIds) {
         List<String> validOptionIds = pollOptionRepository.findByPollId(pollId)
                 .stream()
                 .map(PollOption::getId)
                 .toList();
 
-        for (String optionId : request.getOptionIds()) {
+        for (String optionId : optionIds) {
             if (!validOptionIds.contains(optionId)) {
                 throw new BadRequestException("Invalid option ID: " + optionId);
             }
         }
-
-        // Save vote
-        for (String optionId : request.getOptionIds()) {
-            Vote vote = new Vote();
-            vote.setPollId(pollId);
-            vote.setUserId(user.getId());
-            vote.setOptionId(optionId);
-            voteRepository.save(vote);
-        }
     }
 
-    @Override
-    public PollResultsResponse getPollResults(String pollId, String userId) {
-        return null;
+    private PollResponse updatePollPinStatus(String pollId, boolean pinned) {
+        validatePollId(pollId);
+
+        Poll poll = getPollById(pollId);
+        User user = getCurrentUser();
+        validateGroupMembership(new ObjectId(poll.getGroupId()), user.getId());
+
+        poll.setPinned(pinned);
+        poll = pollRepository.save(poll);
+
+        return buildPollResponse(poll);
     }
 
-    private User getCurrentUser() {
-        // Check user
-        var context = SecurityContextHolder.getContext();
-        String name = context.getAuthentication().getName();
-
-        return userRepository.findByUsername(name)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
+    private PollResponse buildPollResponse(Poll poll) {
+        PollResponse response = pollMapper.toPollResponse(poll);
+        List<PollOption> options = pollOptionRepository.findByPollId(poll.getId());
+        response.setOptions(options.stream().map(pollMapper::toPollOptionResponse).collect(Collectors.toList()));
+        response.setPinned(poll.isPinned());
+        response.setLocked(poll.isLocked());
+        return response;
     }
-
-
 }

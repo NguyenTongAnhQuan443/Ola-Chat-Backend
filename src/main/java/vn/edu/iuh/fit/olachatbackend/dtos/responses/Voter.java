@@ -12,11 +12,15 @@ package vn.edu.iuh.fit.olachatbackend.dtos.responses;
  * @version:    1.0
  */
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Voter {
     private String userId;
     private String optionId;
