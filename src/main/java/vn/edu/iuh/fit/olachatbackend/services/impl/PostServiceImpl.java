@@ -190,4 +190,52 @@ public class PostServiceImpl implements PostService {
                 .or(() -> friendRepository.findByUserIdAndFriendId(user2.getId(), user1.getId()))
                 .isPresent();
     }
+    @Override
+    public PostResponse toggleLikePost(Long postId) {
+        // Retrieve the post
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Check access based on privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to like/unlike this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to like/unlike this post");
+        }
+
+        // Check if the user already liked the post
+        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
+
+        if (alreadyLiked) {
+            // Unlike the post
+            Like like = likeRepository.findAllByPost(post).stream()
+                    .filter(l -> l.getLikedBy().equals(currentUser))
+                    .findFirst()
+                    .orElseThrow(() -> new NotFoundException("Like not found"));
+            likeRepository.delete(like);
+        } else {
+            // Like the post
+            Like like = Like.builder()
+                    .post(post)
+                    .likedBy(currentUser)
+                    .build();
+            likeRepository.save(like);
+        }
+
+        // Fetch all users who liked the post
+        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                .map(Like::getLikedBy)
+                .toList();
+
+        // Map the post to PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setLikedUsers(likedUsers);
+
+        return postResponse;
+    }
 }

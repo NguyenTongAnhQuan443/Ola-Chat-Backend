@@ -15,4 +15,5 @@ public interface PostService {
     List<Post> deletePostByIdAndReturnRemaining(Long postId) throws IOException;
     Post updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     PostResponse likePost(Long postId);
+    PostResponse toggleLikePost(Long postId);
 }

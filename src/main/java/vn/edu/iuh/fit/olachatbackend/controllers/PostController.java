@@ -97,4 +97,9 @@ public class PostController {
         PostResponse postResponse = postService.likePost(postId);
         return ResponseEntity.ok(postResponse);
     }
+    @DeleteMapping("/{postId}/like")
+    public ResponseEntity<PostResponse> toggleLikePost(@PathVariable Long postId) {
+        PostResponse postResponse = postService.toggleLikePost(postId);
+        return ResponseEntity.ok(postResponse);
+    }
 }
