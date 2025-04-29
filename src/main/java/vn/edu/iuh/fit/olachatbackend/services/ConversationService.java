@@ -21,4 +21,6 @@ import java.util.List;
 public interface ConversationService {
     ConversationDTO createConversation(ConversationDTO conversationDTO);
     List<ConversationResponse> getAllConversationsByUserId(String userId);
+    void sendSystemMessageAndUpdateLast(String conversationId, String content);
+
 }

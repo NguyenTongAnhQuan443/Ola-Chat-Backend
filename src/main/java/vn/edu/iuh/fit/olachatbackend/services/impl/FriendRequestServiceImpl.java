@@ -14,21 +14,19 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.FriendRequestDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.NotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.FriendRequestResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
-import vn.edu.iuh.fit.olachatbackend.enums.FriendStatus;
-import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
-import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
+import vn.edu.iuh.fit.olachatbackend.enums.*;
 import vn.edu.iuh.fit.olachatbackend.exceptions.*;
-import vn.edu.iuh.fit.olachatbackend.repositories.DeviceTokenRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRequestRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.mappers.ConversationMapperImpl;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.FriendRequestService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
@@ -47,6 +45,8 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     private final FriendRepository friendRepository;
     private final ConversationService conversationService;
     private final NotificationService notificationService;
+    private final ConversationMapperImpl conversationMapperImpl;
+    private final MessageRepository messageRepository;
 
 
     @Override
@@ -163,16 +163,22 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         friendRepository.save(friend);
 
         // Create conversation
-//        Conversation conversation = Conversation.builder()
-//                .name("Cuộc trò chuyện của " + friendRequest.getSender().getDisplayName() + " và " + )
-//                .avatar(conversationDTO.getAvatar())
-//                .type(conversationDTO.getType())
-//                .lastMessage(conversationDTO.getLastMessage())
-//                .createdAt(LocalDateTime.now())
-//                .updatedAt(LocalDateTime.now())
-//                .build();
-//
-//        conversationService.createConversation(conversation)
+        ConversationDTO conversation = ConversationDTO.builder()
+                .name("Cuộc trò chuyện của " + friendRequest.getSender().getDisplayName() + " và " + receiver.getDisplayName() )
+                .type(ConversationType.PRIVATE)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        ConversationDTO savedConversation = conversationService.createConversation(conversation);
+
+        // Create last message
+        conversationService.sendSystemMessageAndUpdateLast(savedConversation.getId(), friendRequest.getSender().getDisplayName()
+                + " và " + receiver.getDisplayName() + " đã trở thành bạn bè.");
+
+        // Notify for sender
+        notificationService.notifyUser(friendRequest.getSender().getId(), "Chấp nhận lời mời kết bạn",
+                receiver.getDisplayName() + "đã chấp nhận lời mời kết bạn", NotificationType.FRIEND_REQUEST, receiver.getId());
     }
 
     @Override

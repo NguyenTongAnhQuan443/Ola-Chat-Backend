@@ -19,10 +19,15 @@ import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.ConversationResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Conversation;
+import vn.edu.iuh.fit.olachatbackend.entities.LastMessage;
+import vn.edu.iuh.fit.olachatbackend.entities.Message;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
+import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
 import vn.edu.iuh.fit.olachatbackend.enums.ParticipantRole;
+import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
@@ -37,6 +42,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ParticipantRepository participantRepository;
     private final UserMapper userMapper;
     private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
         Conversation conversation = Conversation.builder()
@@ -103,4 +109,33 @@ public class ConversationServiceImpl implements ConversationService {
         }).toList();
     }
 
+    @Override
+    public void sendSystemMessageAndUpdateLast(String conversationId, String content) {
+        // Create system message
+        Message systemMessage = Message.builder()
+                .conversationId(new ObjectId(conversationId))
+                .senderId(null)
+                .content(content)
+                .createdAt(LocalDateTime.now())
+                .type(MessageType.SYSTEM)
+                .build();
+
+        // Save message
+        messageRepository.save(systemMessage);
+
+        // Update lastMessage for conversation
+        Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy conversation!"));
+
+        // Set lastMessage
+        conversation.setLastMessage(LastMessage.builder()
+                        .messageId(systemMessage.getId())
+                        .content(content)
+                        .createdAt(LocalDateTime.now())
+                        .senderId(null)
+                .build());
+        
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+    }
 }
