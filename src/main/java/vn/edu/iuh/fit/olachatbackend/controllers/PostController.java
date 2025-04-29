@@ -4,9 +4,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
+import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
+import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
@@ -20,11 +23,13 @@ public class PostController {
     private final PostService postService;
     private final MediaService mediaService;
     private final PostMapper postMapper;
+    private final LikeRepository likeRepository;
 
-    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper) {
+    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository) {
         this.postService = postService;
         this.mediaService = mediaService;
         this.postMapper = postMapper;
+        this.likeRepository = likeRepository;
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -47,8 +52,17 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public ResponseEntity<PostResponse> getPostById(@PathVariable Long postId) {
-        var post = postService.getPostById(postId);
-        var postResponse = postMapper.toPostResponse(post);
+        Post post = postService.getPostById(postId);
+
+        // Fetch all users who liked the post
+        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                .map(Like::getLikedBy)
+                .toList();
+
+        // Map the post to PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setLikedUsers(likedUsers);
+
         return ResponseEntity.ok(postResponse);
     }
 
@@ -75,6 +89,12 @@ public class PostController {
 
         Post updatedPost = postService.updatePost(postId, content, filesToDelete, newFiles);
         PostResponse postResponse = postMapper.toPostResponse(updatedPost);
+        return ResponseEntity.ok(postResponse);
+    }
+
+    @PostMapping("/{postId}/like")
+    public ResponseEntity<PostResponse> likePost(@PathVariable Long postId) {
+        PostResponse postResponse = postService.likePost(postId);
         return ResponseEntity.ok(postResponse);
     }
 }

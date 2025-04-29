@@ -4,12 +4,17 @@ import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
+import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
+import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.PostRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
@@ -25,11 +30,17 @@ public class PostServiceImpl implements PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final MediaService mediaService;
+    private final LikeRepository likeRepository;
+    private final PostMapper postMapper;
+    private final FriendRepository friendRepository;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
+        this.likeRepository = likeRepository;
+        this.postMapper = postMapper;
+        this.friendRepository = friendRepository;
     }
 
     @Override
@@ -129,5 +140,54 @@ public class PostServiceImpl implements PostService {
 
         // Lưu bài đăng
         return postRepository.save(post);
+    }
+    @Override
+    public PostResponse likePost(Long postId) {
+        // Retrieve the post
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Check access based on privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        }
+
+        // Check if the user already liked the post
+        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
+        if (alreadyLiked) {
+            throw new BadRequestException("You have already liked this post");
+        }
+
+        // Add the like
+        Like like = Like.builder()
+                .post(post)
+                .likedBy(currentUser)
+                .build();
+        likeRepository.save(like);
+
+        // Fetch all users who liked the post
+        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                .map(Like::getLikedBy)
+                .toList();
+
+        // Map the post to PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setLikedUsers(likedUsers);
+
+        return postResponse;
+    }
+
+    // Helper method to check if two users are friends
+    private boolean isFriend(User user1, User user2) {
+        return friendRepository.findByUserIdAndFriendId(user1.getId(), user2.getId())
+                .or(() -> friendRepository.findByUserIdAndFriendId(user2.getId(), user1.getId()))
+                .isPresent();
     }
 }

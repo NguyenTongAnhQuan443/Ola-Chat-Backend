@@ -17,4 +17,5 @@ public class PostResponse {
     private Privacy privacy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<User> likedUsers;
 }
