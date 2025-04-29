@@ -26,6 +26,7 @@ import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
 
@@ -45,6 +46,7 @@ public class MessageServiceImpl implements MessageService {
     private final ParticipantRepository participantRepository;
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
+    private final ConversationService conversationService;
 
     @Override
     public MessageDTO save(MessageDTO messageDTO) {
@@ -62,22 +64,22 @@ public class MessageServiceImpl implements MessageService {
                 .build();
         Message savedMessage = messageRepository.save(message);
 
-        updateLastMessage(savedMessage);
+        conversationService.updateLastMessage(message.getConversationId(), savedMessage);
         return messageDTO;
     }
 
-    private void updateLastMessage(Message message) {
-        LastMessage lastMessage = LastMessage.builder()
-                .messageId(message.getId())
-                .content(message.getContent())
-                .createdAt(message.getCreatedAt())
-                .senderId(message.getSenderId())
-                .build();
-
-        Query query = new Query(Criteria.where("_id").is(message.getConversationId()));
-        Update update = new Update().set("lastMessage", lastMessage);
-        mongoTemplate.updateFirst(query, update, Conversation.class);
-    }
+//    private void updateLastMessage(Message message) {
+//        LastMessage lastMessage = LastMessage.builder()
+//                .messageId(message.getId())
+//                .content(message.getContent())
+//                .createdAt(message.getCreatedAt())
+//                .senderId(message.getSenderId())
+//                .build();
+//
+//        Query query = new Query(Criteria.where("_id").is(message.getConversationId()));
+//        Update update = new Update().set("lastMessage", lastMessage);
+//        mongoTemplate.updateFirst(query, update, Conversation.class);
+//    }
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId) {
         List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId));
@@ -133,6 +135,9 @@ public class MessageServiceImpl implements MessageService {
             message.setMediaUrls(null);  // Nếu là tin nhắn media thì xóa URL
             messageRepository.save(message);
         }
+
+        // Update last message
+        conversationService.updateLastMessage(message.getConversationId(), message);
 
 //         Trả về MessageDTO với trạng thái tin nhắn đã thu hồi
         return MessageDTO.builder()

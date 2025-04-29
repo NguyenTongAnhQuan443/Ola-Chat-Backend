@@ -18,6 +18,7 @@ import org.bson.types.ObjectId;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.FriendRequestDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.NotificationRequest;
@@ -101,9 +102,9 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         User currentUser = getCurrentUser();
         List<FriendRequest> requests = friendRequestRepository.findByReceiverAndStatus(currentUser, RequestStatus.PENDING);
 
-        if (requests.isEmpty()) {
-            throw new NotFoundException("Bạn chưa nhận được lời mời kết bạn.");
-        }
+//        if (requests.isEmpty()) {
+//            throw new NotFoundException("Bạn chưa nhận được lời mời kết bạn.");
+//        }
 
         return requests.stream()
                 .map(req -> new FriendRequestResponse(
@@ -119,9 +120,9 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         User currentUser = getCurrentUser();
         List<FriendRequest> requests = friendRequestRepository.findBySenderAndStatus(currentUser, RequestStatus.PENDING);
 
-        if (requests.isEmpty()) {
-            throw new NotFoundException("Bạn chưa gửi bất kì lời mời kết nào.");
-        }
+//        if (requests.isEmpty()) {
+//            throw new NotFoundException("Bạn chưa gửi bất kì lời mời kết nào.");
+//        }
 
         return requests.stream()
                 .map(req -> new FriendRequestResponse(
@@ -134,6 +135,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     }
 
     @Override
+    @Transactional
     public void acceptFriendRequest(String requestId) {
         User receiver  = getCurrentUser();
 
@@ -168,6 +170,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
                 .type(ConversationType.PRIVATE)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
+                .userIds(List.of(friendRequest.getSender().getId(), receiver.getId()))
                 .build();
 
         ConversationDTO savedConversation = conversationService.createConversation(conversation);
