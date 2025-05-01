@@ -52,7 +52,6 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
     @Override
     public FriendRequestDTO sendFriendRequest(FriendRequestDTO friendRequestDTO) {
-
         String receiverId = friendRequestDTO.getReceiverId();
         String senderId = friendRequestDTO.getSenderId();
 
@@ -61,14 +60,46 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new NotFoundException("Người nhận không tồn tại."));
 
-        if (friendRequestRepository.existsBySenderAndReceiver(sender, receiver)) {
-            throw new ConflicException("Lời mời đã được gửi trước đó.");
+        Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findBySenderAndReceiver(sender, receiver);
+        if (existingRequestOpt.isPresent()) {
+            FriendRequest existingRequest = existingRequestOpt.get();
+            RequestStatus status = existingRequest.getStatus();
+
+            if (status == RequestStatus.PENDING) {
+                throw new ConflicException("Lời mời đã được gửi trước đó.");
+            }
+
+            if (status == RequestStatus.ACCEPTED) {
+                throw new ConflicException("Hai người đã là bạn bè.");
+            }
+
+            if (status == RequestStatus.REJECTED) {
+                LocalDateTime rejectedTime = existingRequest.getResponseAt();
+                if (rejectedTime != null && rejectedTime.plusHours(24).isAfter(LocalDateTime.now())) {
+                    throw new BadRequestException("Bạn chỉ có thể gửi lại lời mời sau 24 giờ kể từ khi bị từ chối.");
+                }
+
+                // Đã đủ 24 giờ → cập nhật lại lời mời cũ thay vì tạo mới
+                existingRequest.setStatus(RequestStatus.PENDING);
+                existingRequest.setResponseAt(null); // clear thời gian bị từ chối
+                FriendRequest updated = friendRequestRepository.save(existingRequest);
+
+                try {
+                    notificationService.notifyUser(receiverId, "Lời mời kết bạn",
+                            "Bạn có lời mời kết bạn từ " + sender.getDisplayName(),
+                            NotificationType.FRIEND_REQUEST, sender.getId());
+                } catch (Exception e) {
+                    log.error("Lỗi khi gửi thông báo {}", e.getMessage());
+                }
+
+                return FriendRequestDTO.builder()
+                        .senderId(updated.getSender().getId())
+                        .receiverId(updated.getReceiver().getId())
+                        .build();
+            }
         }
 
-        if (friendRequestRepository.areFriends(sender, receiver)) {
-            throw new ConflicException("Hai người đã là bạn bè.");
-        }
-
+        // Trường hợp chưa từng có lời mời
         try {
             notificationService.notifyUser(receiverId, "Lời mời kết bạn", "Bạn có lời mời kết bạn từ " + sender.getDisplayName(),
                     NotificationType.FRIEND_REQUEST, sender.getId());
@@ -81,14 +112,14 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         friendRequest.setReceiver(receiver);
         friendRequest.setStatus(RequestStatus.PENDING);
 
-        FriendRequest rs =  friendRequestRepository.save(friendRequest);
+        FriendRequest savedRequest = friendRequestRepository.save(friendRequest);
 
         return FriendRequestDTO.builder()
-                .senderId(rs.getSender().getId())
-                .receiverId(rs.getReceiver().getId())
+                .senderId(savedRequest.getSender().getId())
+                .receiverId(savedRequest.getReceiver().getId())
                 .build();
-
     }
+
 
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -181,7 +212,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
         // Notify for sender
         notificationService.notifyUser(friendRequest.getSender().getId(), "Chấp nhận lời mời kết bạn",
-                receiver.getDisplayName() + "đã chấp nhận lời mời kết bạn", NotificationType.FRIEND_REQUEST, receiver.getId());
+                receiver.getDisplayName() + " đã chấp nhận lời mời kết bạn", NotificationType.FRIEND_REQUEST, receiver.getId());
     }
 
     @Override
