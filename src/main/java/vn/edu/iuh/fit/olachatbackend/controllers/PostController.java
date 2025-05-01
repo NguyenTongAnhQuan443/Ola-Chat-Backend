@@ -6,9 +6,11 @@ import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
+import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
+import vn.edu.iuh.fit.olachatbackend.repositories.CommentRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
@@ -24,12 +26,14 @@ public class PostController {
     private final MediaService mediaService;
     private final PostMapper postMapper;
     private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
 
-    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository) {
+    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository, CommentRepository commentRepository) {
         this.postService = postService;
         this.mediaService = mediaService;
         this.postMapper = postMapper;
         this.likeRepository = likeRepository;
+        this.commentRepository = commentRepository;
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -110,5 +114,16 @@ public class PostController {
             @RequestParam("content") String content) {
         PostResponse postResponse = postService.addCommentToPost(postId, content);
         return ResponseEntity.ok(postResponse);
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<List<Comment>> getCommentsByPostId(@PathVariable Long postId) {
+        // Lấy bài đăng từ DB
+        Post post = postService.getPostById(postId);
+
+        // Lấy danh sách bình luận của bài đăng
+        List<Comment> comments = commentRepository.findAllByPost(post);
+
+        return ResponseEntity.ok(comments);
     }
 }
