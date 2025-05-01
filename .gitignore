@@ -62,3 +62,5 @@ HELP.md
 
 src/main/resources/fileDownload/
 src/main/resources/serviceAccountKey.json
+
+.idea/
