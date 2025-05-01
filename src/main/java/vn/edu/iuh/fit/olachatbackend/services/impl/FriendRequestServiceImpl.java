@@ -109,7 +109,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         return requests.stream()
                 .map(req -> new FriendRequestResponse(
                         req.getId(),
-                        req.getReceiver().getId(),
+                        req.getSender().getId(),
                         req.getSender().getDisplayName(),
                         req.getSender().getAvatar()
                 ))
