@@ -1,6 +1,7 @@
 package vn.edu.iuh.fit.olachatbackend.services;
 
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
@@ -10,11 +11,14 @@ import java.util.List;
 
 public interface PostService {
     Post createPost(String content, String privacy, List<Media> mediaList);
-    Post getPostById(Long postId);
-    List<Post> getAllPosts();
-    List<Post> deletePostByIdAndReturnRemaining(Long postId) throws IOException;
-    Post updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
+    PostResponse getPostById(Long postId);
+    List<PostResponse> getAllPosts();
+    List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException;
+    PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     PostResponse likePost(Long postId);
     PostResponse toggleLikePost(Long postId);
     PostResponse addCommentToPost(Long postId, String content);
+    List<CommentHierarchyResponse> getCommentHierarchy(Long postId);
+    List<CommentHierarchyResponse> deleteComment(Long commentId);
+    List<CommentHierarchyResponse> addReplyToComment(Long postId, Long commentId, String content);
 }

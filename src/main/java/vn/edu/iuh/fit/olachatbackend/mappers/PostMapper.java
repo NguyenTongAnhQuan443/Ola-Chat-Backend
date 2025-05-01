@@ -3,7 +3,9 @@ package vn.edu.iuh.fit.olachatbackend.mappers;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
@@ -16,10 +18,12 @@ public interface PostMapper {
     PostMapper INSTANCE = Mappers.getMapper(PostMapper.class);
 
     @Mapping(target = "likedUsers", expression = "java(mapLikedUsers(post.getLikes()))")
-    @Mapping(target = "comments", source = "comments")
+    @Mapping(target = "comments", expression = "java(commentListToCommentHierarchyResponseList(post.getComments()))")
     PostResponse toPostResponse(Post post);
 
     List<PostResponse> toPostResponseList(List<Post> posts);
+
+    List<CommentHierarchyResponse> commentListToCommentHierarchyResponseList(List<Comment> comments);
 
     default List<User> mapLikedUsers(List<Like> likes) {
         return likes.stream()

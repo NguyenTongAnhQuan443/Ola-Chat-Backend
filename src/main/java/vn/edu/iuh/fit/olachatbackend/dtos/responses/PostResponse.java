@@ -19,5 +19,5 @@ public class PostResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<User> likedUsers;
-    private List<Comment> comments;
+    private List<CommentHierarchyResponse> comments;
 }

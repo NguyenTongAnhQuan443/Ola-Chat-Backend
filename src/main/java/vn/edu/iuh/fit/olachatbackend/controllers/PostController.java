@@ -1,21 +1,19 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
-import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
-import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
-import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.CommentRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.CommentService;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
@@ -31,14 +29,14 @@ public class PostController {
     private final MediaService mediaService;
     private final PostMapper postMapper;
     private final LikeRepository likeRepository;
-    private final CommentRepository commentRepository;
+    @Autowired
+    private CommentService commentService;
 
-    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository, CommentRepository commentRepository, UserRepository userRepository) {
+    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository, UserRepository userRepository) {
         this.postService = postService;
         this.mediaService = mediaService;
         this.postMapper = postMapper;
         this.likeRepository = likeRepository;
-        this.commentRepository = commentRepository;
         this.userRepository = userRepository;
     }
 
@@ -62,31 +60,19 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public ResponseEntity<PostResponse> getPostById(@PathVariable Long postId) {
-        Post post = postService.getPostById(postId);
-
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
-        // Map the post to PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setLikedUsers(likedUsers);
-
+        PostResponse postResponse = postService.getPostById(postId);
         return ResponseEntity.ok(postResponse);
     }
 
     @GetMapping
     public ResponseEntity<List<PostResponse>> getAllPosts() {
-        var posts = postService.getAllPosts();
-        var postResponses = postMapper.toPostResponseList(posts);
+        List<PostResponse> postResponses = postService.getAllPosts();
         return ResponseEntity.ok(postResponses);
     }
 
     @DeleteMapping("/{postId}")
     public ResponseEntity<List<PostResponse>> deletePostAndReturnRemaining(@PathVariable Long postId) throws IOException {
-        List<Post> remainingPosts = postService.deletePostByIdAndReturnRemaining(postId);
-        List<PostResponse> postResponses = postMapper.toPostResponseList(remainingPosts);
+        List<PostResponse> postResponses = postService.deletePostByIdAndReturnRemaining(postId);
         return ResponseEntity.ok(postResponses);
     }
 
@@ -97,8 +83,7 @@ public class PostController {
             @RequestParam(value = "filesToDelete", required = false) List<String> filesToDelete,
             @RequestParam(value = "newFiles", required = false) List<MultipartFile> newFiles) throws IOException {
 
-        Post updatedPost = postService.updatePost(postId, content, filesToDelete, newFiles);
-        PostResponse postResponse = postMapper.toPostResponse(updatedPost);
+        PostResponse postResponse = postService.updatePost(postId, content, filesToDelete, newFiles);
         return ResponseEntity.ok(postResponse);
     }
 
@@ -122,39 +107,25 @@ public class PostController {
         return ResponseEntity.ok(postResponse);
     }
 
-    @GetMapping("/{postId}/comments")
-    public ResponseEntity<List<Comment>> getCommentsByPostId(@PathVariable Long postId) {
-        // Lấy bài đăng từ DB
-        Post post = postService.getPostById(postId);
-
-        // Lấy danh sách bình luận của bài đăng
-        List<Comment> comments = commentRepository.findAllByPost(post);
-
-        return ResponseEntity.ok(comments);
+    //Lấy danh sách bình luận theo cấu trúc phân cấp
+    @GetMapping("/{postId}/comments/hierarchy")
+    public ResponseEntity<List<CommentHierarchyResponse>> getCommentHierarchy(@PathVariable Long postId) {
+        List<CommentHierarchyResponse> commentHierarchy = postService.getCommentHierarchy(postId);
+        return ResponseEntity.ok(commentHierarchy);
     }
 
     @DeleteMapping("/comments/{commentId}")
-    public ResponseEntity<List<Comment>> deleteComment(@PathVariable Long commentId) {
-        // Lấy bình luận từ DB
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new NotFoundException("Comment not found with id: " + commentId));
-
-        // Lấy người dùng hiện tại
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new NotFoundException("User not found"));
-
-        // Kiểm tra quyền: chỉ chủ bình luận hoặc chủ bài đăng mới được xóa
-        if (!comment.getCommentedBy().equals(currentUser) && !comment.getPost().getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to delete this comment");
-        }
-
-        // Xóa bình luận
-        commentRepository.delete(comment);
-
-        Post post = comment.getPost();
-        List<Comment> updatedComments = commentRepository.findAllByPost(post);
-
+    public ResponseEntity<List<CommentHierarchyResponse>> deleteComment(@PathVariable Long commentId) {
+        List<CommentHierarchyResponse> updatedComments = postService.deleteComment(commentId);
         return ResponseEntity.ok(updatedComments);
+    }
+
+    @PostMapping("/{postId}/comments/{commentId}/replies")
+    public ResponseEntity<List<CommentHierarchyResponse>> addReplyToComment(
+            @PathVariable Long postId,
+            @PathVariable Long commentId,
+            @RequestParam("content") String content) {
+        List<CommentHierarchyResponse> commentHierarchy = postService.addReplyToComment(postId, commentId, content);
+        return ResponseEntity.ok(commentHierarchy);
     }
 }

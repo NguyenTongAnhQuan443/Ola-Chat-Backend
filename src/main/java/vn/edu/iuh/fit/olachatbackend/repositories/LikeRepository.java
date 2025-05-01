@@ -18,6 +18,6 @@ import java.util.List;
 
 public interface LikeRepository extends JpaRepository<Like, Long> {
     boolean existsByPostAndLikedBy(Post post, User likedBy);
-
+    void deleteAllByPost(Post post);
     List<Like> findAllByPost(Post post);
 }

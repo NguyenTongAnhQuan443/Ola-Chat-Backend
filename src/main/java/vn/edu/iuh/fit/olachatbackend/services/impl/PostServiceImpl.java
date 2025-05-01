@@ -1,9 +1,9 @@
 package vn.edu.iuh.fit.olachatbackend.services.impl;
 
-import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
@@ -11,6 +11,7 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.*;
+import vn.edu.iuh.fit.olachatbackend.services.CommentService;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
@@ -28,8 +29,9 @@ public class PostServiceImpl implements PostService {
     private final PostMapper postMapper;
     private final FriendRepository friendRepository;
     private final CommentRepository commentRepository;
+    private final CommentService commentService;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
@@ -37,6 +39,7 @@ public class PostServiceImpl implements PostService {
         this.postMapper = postMapper;
         this.friendRepository = friendRepository;
         this.commentRepository = commentRepository;
+        this.commentService = commentService;
     }
 
     @Override
@@ -71,18 +74,55 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public Post getPostById(Long postId) {
-        return postRepository.findById(postId)
+    public PostResponse getPostById(Long postId) {
+        Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Fetch all comments and build hierarchy
+        List<Comment> allComments = commentService.findAllByPost(post);
+        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
+        // Fetch all users who liked the post
+        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                .map(Like::getLikedBy)
+                .toList();
+
+        // Map the post to PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setComments(commentHierarchy);
+        postResponse.setLikedUsers(likedUsers);
+
+        return postResponse;
     }
 
     @Override
-    public List<Post> getAllPosts() {
-        return postRepository.findAll();
+    public List<PostResponse> getAllPosts() {
+        List<Post> posts = postRepository.findAll();
+        List<PostResponse> postResponses = new ArrayList<>();
+
+        for (Post post : posts) {
+            // Fetch all comments and build hierarchy
+            List<Comment> allComments = commentService.findAllByPost(post);
+            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
+            // Fetch all users who liked the post
+            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                    .map(Like::getLikedBy)
+                    .toList();
+
+            // Map the post to PostResponse
+            PostResponse postResponse = postMapper.toPostResponse(post);
+            postResponse.setComments(commentHierarchy);
+            postResponse.setLikedUsers(likedUsers);
+
+            postResponses.add(postResponse);
+        }
+
+        return postResponses;
     }
 
     @Override
-    public List<Post> deletePostByIdAndReturnRemaining(Long postId) throws IOException {
+    public List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException {
         // Fetch the post from the database
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
@@ -92,15 +132,42 @@ public class PostServiceImpl implements PostService {
             mediaService.deleteMediaFromCloudinary(post.getAttachments());
         }
 
+        // Delete all likes associated with the post
+        likeRepository.deleteAllByPost(post);
+
+        // Delete all comments associated with the post
+        commentRepository.deleteAllByPost(post);
+
         // Delete the post from the database
         postRepository.delete(post);
 
-        // Fetch the remaining posts of the user
-        return postRepository.findByCreatedBy(post.getCreatedBy());
+        // Fetch all remaining posts
+        List<Post> remainingPosts = postRepository.findAll();
+        List<PostResponse> postResponses = new ArrayList<>();
+
+        for (Post remainingPost : remainingPosts) {
+            // Fetch all comments and build hierarchy
+            List<Comment> allComments = commentService.findAllByPost(remainingPost);
+            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
+            // Fetch all users who liked the post
+            List<User> likedUsers = likeRepository.findAllByPost(remainingPost).stream()
+                    .map(Like::getLikedBy)
+                    .toList();
+
+            // Map the post to PostResponse
+            PostResponse postResponse = postMapper.toPostResponse(remainingPost);
+            postResponse.setComments(commentHierarchy);
+            postResponse.setLikedUsers(likedUsers);
+
+            postResponses.add(postResponse);
+        }
+
+        return postResponses;
     }
 
     @Override
-    public Post updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException {
+    public PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException {
         // Lấy bài đăng từ DB
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
@@ -135,8 +202,26 @@ public class PostServiceImpl implements PostService {
         post.setUpdatedAt(LocalDateTime.now());
 
         // Lưu bài đăng
-        return postRepository.save(post);
+        postRepository.save(post);
+
+        // Lấy tất cả bình luận của bài đăng và xây dựng cấu trúc phân cấp
+        List<Comment> allComments = commentService.findAllByPost(post);
+        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
+        // Lấy tất cả người dùng đã thích bài đăng
+        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+                .map(Like::getLikedBy)
+                .toList();
+
+        // Map bài đăng sang PostResponse
+        PostResponse postResponse = postMapper.toPostResponse(post);
+        postResponse.setComments(commentHierarchy);
+        postResponse.setLikedUsers(likedUsers);
+
+        return postResponse;
     }
+
+
     @Override
     public PostResponse likePost(Long postId) {
         // Retrieve the post
@@ -173,9 +258,14 @@ public class PostServiceImpl implements PostService {
                 .map(Like::getLikedBy)
                 .toList();
 
+        // Fetch all comments and build hierarchy
+        List<Comment> allComments = commentService.findAllByPost(post);
+        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setLikedUsers(likedUsers);
+        postResponse.setComments(commentHierarchy);
 
         return postResponse;
     }
@@ -186,6 +276,7 @@ public class PostServiceImpl implements PostService {
                 .or(() -> friendRepository.findByUserIdAndFriendId(user2.getId(), user1.getId()))
                 .isPresent();
     }
+
     @Override
     public PostResponse toggleLikePost(Long postId) {
         // Retrieve the post
@@ -228,12 +319,18 @@ public class PostServiceImpl implements PostService {
                 .map(Like::getLikedBy)
                 .toList();
 
+        // Fetch all comments and build hierarchy
+        List<Comment> allComments = commentService.findAllByPost(post);
+        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setLikedUsers(likedUsers);
+        postResponse.setComments(commentHierarchy);
 
         return postResponse;
     }
+
     @Override
     public PostResponse addCommentToPost(Long postId, String content) {
         // Lấy bài đăng từ DB
@@ -261,15 +358,83 @@ public class PostServiceImpl implements PostService {
                 .build();
 
         // Lưu bình luận vào DB
-        commentRepository.save(comment);
+        commentService.save(comment);
 
-        // Lấy danh sách bình luận của bài đăng
-        List<Comment> comments = commentRepository.findAllByPost(post);
+        // Lấy tất cả bình luận của bài đăng
+        List<Comment> allComments = commentService.findAllByPost(post);
+
+        // Xây dựng cấu trúc phân cấp cho bình luận
+        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
         // Map bài đăng sang PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setComments(comments);
+        postResponse.setComments(commentHierarchy);
 
         return postResponse;
+    }
+    @Override
+    public List<CommentHierarchyResponse> getCommentHierarchy(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+        List<Comment> allComments = commentService.findAllByPost(post);
+        return commentService.buildCommentHierarchy(allComments);
+    }
+
+    @Override
+    public List<CommentHierarchyResponse> deleteComment(Long commentId) {
+        Comment comment = commentService.findById(commentId)
+                .orElseThrow(() -> new NotFoundException("Comment not found with id: " + commentId));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        if (!comment.getCommentedBy().equals(currentUser) && !comment.getPost().getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to delete this comment");
+        }
+
+        commentService.delete(comment);
+
+        Post post = comment.getPost();
+        List<Comment> updatedComments = commentService.findAllByPost(post);
+        return commentService.buildCommentHierarchy(updatedComments);
+    }
+
+    @Override
+    public List<CommentHierarchyResponse> addReplyToComment(Long postId, Long commentId, String content) {
+        // Lấy bài đăng từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy bình luận cha và kiểm tra xem nó có thuộc bài đăng không
+        Comment parentComment = commentService.findById(commentId)
+                .orElseThrow(() -> new NotFoundException("Comment not found with id: " + commentId));
+        if (!parentComment.getPost().equals(post)) {
+            throw new BadRequestException("The comment does not belong to the specified post");
+        }
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Tạo bình luận trả lời
+        Comment replyComment = Comment.builder()
+                .post(post)
+                .parentComment(parentComment)
+                .commentedBy(currentUser)
+                .content(content)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(null) // Set updatedAt to null initially
+                .build();
+
+        // Lưu bình luận trả lời
+        commentService.save(replyComment);
+
+        // Lấy tất cả bình luận của bài đăng
+        List<Comment> allComments = commentService.findAllByPost(post);
+
+        // Xây dựng cấu trúc phân cấp
+        return commentService.buildCommentHierarchy(allComments);
     }
 }
