@@ -228,4 +228,21 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         reverseRelationOpt.ifPresent(friendRepository::delete);
 
     }
+
+    @Override
+    public void cancelSentRequest(String receiverId) {
+        User sender = getCurrentUser();
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new NotFoundException("Người nhận không tồn tại."));
+
+        FriendRequest request = friendRequestRepository.findBySenderAndReceiver(sender, receiver)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy lời mời kết bạn."));
+
+        if (!request.getStatus().equals(RequestStatus.PENDING)) {
+            throw new BadRequestException("Chỉ có thể hủy lời mời đang chờ.");
+        }
+
+        friendRequestRepository.delete(request);
+    }
+
 }
