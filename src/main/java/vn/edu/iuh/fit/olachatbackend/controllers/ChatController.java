@@ -17,12 +17,10 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageResponseDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Mention;
 import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
-import vn.edu.iuh.fit.olachatbackend.mappers.MessageMapper;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 import vn.edu.iuh.fit.olachatbackend.services.impl.UserServiceImpl;
@@ -37,39 +35,6 @@ public class ChatController {
     private final MessageService messageService;
     private final NotificationService notificationService;
     private final UserServiceImpl userServiceImpl;
-    private final MessageMapper messageMapper;
-
-    /**
-     * Handles messages sent to chat rooms
-     *
-     * @param messageDTO Message information from client
-     * @return MessageResponseDTO Processed message information
-     */
-    @MessageMapping("/message")
-    public MessageResponseDTO receiveGroupMessage(@Payload MessageRequest messageDTO) {
-        System.out.println("Message from client for chat room: " + messageDTO);
-
-        // Save message to database
-        messageService.save(messageDTO);
-
-        // Broadcast message to all room members
-        template.convertAndSend("/chatroom/" + messageDTO.getConversationId(), messageDTO);
-
-        // Send notification to recipients
-        UserResponse sender = userServiceImpl.getUserById(messageDTO.getSenderId());
-        notificationService.notifyConversation(
-                messageDTO.getConversationId(),
-                messageDTO.getSenderId(),
-                "Tin nhắn mới",
-                "Bạn có tin nhắn từ " + sender.getDisplayName(),
-                NotificationType.MESSAGE
-        );
-
-        // Process @mentions
-        processMentions(messageDTO, sender);
-
-        return messageMapper.toResponseDTO(messageDTO);
-    }
 
     /**
      * Handles private messages between two users
@@ -78,7 +43,7 @@ public class ChatController {
      * @return MessageResponseDTO Processed message information
      */
     @MessageMapping("/private-message")
-    public MessageResponseDTO receivePrivateMessage(@Payload MessageRequest messageDTO) {
+    public MessageDTO receivePrivateMessage(@Payload MessageDTO messageDTO) {
         System.out.println("Private message from client: " + messageDTO);
 
         // Save message to database
@@ -97,13 +62,16 @@ public class ChatController {
                 NotificationType.MESSAGE
         );
 
-        return messageMapper.toResponseDTO(messageDTO);
+        // Process @mentions
+        processMentions(messageDTO, sender);
+
+        return messageDTO;
     }
 
     @MessageMapping("/recall-message")
-    public void recallMessage(@Payload MessageRequest messageDTO) {
+    public void recallMessage(@Payload MessageDTO messageDTO) {
         System.out.println("Message Recall from client: "+ messageDTO);
-        MessageRequest recalled = messageService.recallMessage(messageDTO.getId(), messageDTO.getSenderId());
+        MessageDTO recalled = messageService.recallMessage(messageDTO.getId(), messageDTO.getSenderId());
         template.convertAndSend("/user/" + recalled.getConversationId() + "/private", recalled);
     }
 
@@ -113,7 +81,7 @@ public class ChatController {
      * @param messageDTO Message information
      * @param sender Message sender
      */
-    private void processMentions(MessageRequest messageDTO, UserResponse sender) {
+    private void processMentions(MessageDTO messageDTO, UserResponse sender) {
         if (messageDTO.getMentions() == null || messageDTO.getMentions().isEmpty()) {
             return;
         }
