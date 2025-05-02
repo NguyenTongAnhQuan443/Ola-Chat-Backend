@@ -40,7 +40,7 @@ public class SecurityConfig {
             "/api/login-history/**",
             "/files/**",
             "/api/friends/**",
-            "/api/notifications/**",
+//            "/api/notifications/**",
             "/users"
     };
 
