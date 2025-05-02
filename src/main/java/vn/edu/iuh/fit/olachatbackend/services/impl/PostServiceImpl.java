@@ -4,6 +4,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentedByResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
@@ -401,17 +402,13 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public List<CommentHierarchyResponse> addReplyToComment(Long postId, Long commentId, String content) {
-        // Lấy bài đăng từ DB
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
-
-        // Lấy bình luận cha và kiểm tra xem nó có thuộc bài đăng không
+    public List<CommentHierarchyResponse> addReplyToComment(Long commentId, String content) {
+        // Lấy bình luận cha
         Comment parentComment = commentService.findById(commentId)
                 .orElseThrow(() -> new NotFoundException("Comment not found with id: " + commentId));
-        if (!parentComment.getPost().equals(post)) {
-            throw new BadRequestException("The comment does not belong to the specified post");
-        }
+
+        // Lấy bài đăng từ bình luận cha
+        Post post = parentComment.getPost();
 
         // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -436,5 +433,44 @@ public class PostServiceImpl implements PostService {
 
         // Xây dựng cấu trúc phân cấp
         return commentService.buildCommentHierarchy(allComments);
+    }
+
+    // Cập nhật bình luận
+    @Override
+    public CommentHierarchyResponse updateComment(Long commentId, String content) {
+        // Retrieve the comment from the database
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new NotFoundException("Comment not found with id: " + commentId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Check if the current user is the owner of the comment
+        if (!comment.getCommentedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to update this comment");
+        }
+
+        // Update the comment content and updatedAt field
+        comment.setContent(content);
+        comment.setUpdatedAt(LocalDateTime.now());
+
+        // Save the updated comment
+        commentRepository.save(comment);
+
+        // Map the updated comment to CommentHierarchyResponse
+        return CommentHierarchyResponse.builder()
+                .commentId(comment.getCommentId())
+                .content(comment.getContent())
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .commentedBy(CommentedByResponse.builder()
+                        .username(currentUser.getUsername())
+                        .displayName(currentUser.getDisplayName())
+                        .avatar(currentUser.getAvatar())
+                        .build())
+                .replies(new ArrayList<>()) // Replies are not needed for this response
+                .build();
     }
 }

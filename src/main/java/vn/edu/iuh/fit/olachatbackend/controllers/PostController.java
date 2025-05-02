@@ -120,12 +120,19 @@ public class PostController {
         return ResponseEntity.ok(updatedComments);
     }
 
-    @PostMapping("/{postId}/comments/{commentId}/replies")
+    @PostMapping("/comments/{commentId}/replies")
     public ResponseEntity<List<CommentHierarchyResponse>> addReplyToComment(
-            @PathVariable Long postId,
             @PathVariable Long commentId,
             @RequestParam("content") String content) {
-        List<CommentHierarchyResponse> commentHierarchy = postService.addReplyToComment(postId, commentId, content);
+        List<CommentHierarchyResponse> commentHierarchy = postService.addReplyToComment(commentId, content);
         return ResponseEntity.ok(commentHierarchy);
+    }
+
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<CommentHierarchyResponse> updateComment(
+            @PathVariable Long commentId,
+            @RequestParam("content") String content) {
+        CommentHierarchyResponse updatedComment = postService.updateComment(commentId, content);
+        return ResponseEntity.ok(updatedComment);
     }
 }
