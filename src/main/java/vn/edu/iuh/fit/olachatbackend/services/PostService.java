@@ -12,7 +12,8 @@ import java.util.List;
 public interface PostService {
     Post createPost(String content, String privacy, List<Media> mediaList);
     PostResponse getPostById(Long postId);
-    List<PostResponse> getAllPosts();
+    //List<PostResponse> getAllPosts();
+    List<PostResponse> getUserPosts();
     List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException;
     PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     PostResponse likePost(Long postId);

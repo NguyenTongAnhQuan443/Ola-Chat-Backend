@@ -79,8 +79,21 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PostResponse getPostById(Long postId) {
+        // Retrieve the post from the database
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Check access based on privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to access this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser) && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to access this post");
+        }
 
         // Fetch all comments and build hierarchy
         List<Comment> allComments = commentService.findAllByPost(post);
@@ -100,8 +113,14 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public List<PostResponse> getAllPosts() {
-        List<Post> posts = postRepository.findAll();
+    public List<PostResponse> getUserPosts() {
+        // Retrieve the currently authenticated user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Fetch posts created by the current user
+        List<Post> posts = postRepository.findByCreatedBy(currentUser);
         List<PostResponse> postResponses = new ArrayList<>();
 
         for (Post post : posts) {
@@ -124,6 +143,32 @@ public class PostServiceImpl implements PostService {
 
         return postResponses;
     }
+
+//    @Override
+//    public List<PostResponse> getAllPosts() {
+//        List<Post> posts = postRepository.findAll();
+//        List<PostResponse> postResponses = new ArrayList<>();
+//
+//        for (Post post : posts) {
+//            // Fetch all comments and build hierarchy
+//            List<Comment> allComments = commentService.findAllByPost(post);
+//            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+//
+//            // Fetch all users who liked the post
+//            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
+//                    .map(Like::getLikedBy)
+//                    .toList();
+//
+//            // Map the post to PostResponse
+//            PostResponse postResponse = postMapper.toPostResponse(post);
+//            postResponse.setComments(commentHierarchy);
+//            postResponse.setLikedUsers(likedUsers);
+//
+//            postResponses.add(postResponse);
+//        }
+//
+//        return postResponses;
+//    }
 
     @Override
     @Transactional

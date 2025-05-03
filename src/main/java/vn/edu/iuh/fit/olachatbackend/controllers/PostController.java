@@ -64,9 +64,15 @@ public class PostController {
         return ResponseEntity.ok(postResponse);
     }
 
+//    @GetMapping
+//    public ResponseEntity<List<PostResponse>> getAllPosts() {
+//        List<PostResponse> postResponses = postService.getAllPosts();
+//        return ResponseEntity.ok(postResponses);
+//    }
+
     @GetMapping
-    public ResponseEntity<List<PostResponse>> getAllPosts() {
-        List<PostResponse> postResponses = postService.getAllPosts();
+    public ResponseEntity<List<PostResponse>> getUserPosts() {
+        List<PostResponse> postResponses = postService.getUserPosts();
         return ResponseEntity.ok(postResponses);
     }
 
