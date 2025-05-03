@@ -2,6 +2,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentedByResponse;
@@ -31,8 +32,9 @@ public class PostServiceImpl implements PostService {
     private final FriendRepository friendRepository;
     private final CommentRepository commentRepository;
     private final CommentService commentService;
+    private final ShareRepository shareRepository;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService) {
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
@@ -41,6 +43,7 @@ public class PostServiceImpl implements PostService {
         this.friendRepository = friendRepository;
         this.commentRepository = commentRepository;
         this.commentService = commentService;
+        this.shareRepository = shareRepository;
     }
 
     @Override
@@ -123,10 +126,22 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional
     public List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException {
         // Fetch the post from the database
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Check if the post is a shared post
+        if (post.getOriginalPost() != null) {
+            // Retrieve the current user
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            User currentUser = userRepository.findByUsername(currentUsername)
+                    .orElseThrow(() -> new NotFoundException("User not found"));
+
+            // Delete the specific entry in the post_share table
+            shareRepository.deleteByPostAndSharedBy(post.getOriginalPost(), currentUser);
+        }
 
         // Delete associated media using MediaService
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
@@ -173,32 +188,52 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Cập nhật content nếu có
-        if (content != null && !content.isEmpty()) {
-            post.setContent(content);
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền sở hữu bài đăng
+        if (!post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to update this post");
         }
 
-        // Xóa media nếu có filesToDelete
-        if (filesToDelete != null && !filesToDelete.isEmpty()) {
-            List<Media> mediaToDelete = post.getAttachments().stream()
-                    .filter(media -> filesToDelete.contains(media.getPublicId()))
-                    .toList();
-
-            mediaService.deleteMediaFromCloudinary(mediaToDelete);
-            post.getAttachments().removeAll(mediaToDelete);
-        }
-
-        // Thêm media mới nếu có newFiles
-        if (newFiles != null && !newFiles.isEmpty()) {
-            List<Media> newMedia = new ArrayList<>();
-            for (MultipartFile file : newFiles) {
-                Media media = mediaService.uploadMedia(file);
-                media.setPost(post);
-                newMedia.add(media);
+        // Kiểm tra nếu bài đăng là bài share
+        if (post.getOriginalPost() != null) {
+            // Chỉ cho phép cập nhật content
+            if (content != null && !content.isEmpty()) {
+                post.setContent(content);
+            } else {
+                throw new BadRequestException("Shared posts can only update content.");
             }
-            post.getAttachments().addAll(newMedia);
-        }
+        } else {
 
+            // Cập nhật content nếu có
+            if (content != null && !content.isEmpty()) {
+                post.setContent(content);
+            }
+
+            // Xóa media nếu có filesToDelete
+            if (filesToDelete != null && !filesToDelete.isEmpty()) {
+                List<Media> mediaToDelete = post.getAttachments().stream()
+                        .filter(media -> filesToDelete.contains(media.getPublicId()))
+                        .toList();
+
+                mediaService.deleteMediaFromCloudinary(mediaToDelete);
+                post.getAttachments().removeAll(mediaToDelete);
+            }
+
+            // Thêm media mới nếu có newFiles
+            if (newFiles != null && !newFiles.isEmpty()) {
+                List<Media> newMedia = new ArrayList<>();
+                for (MultipartFile file : newFiles) {
+                    Media media = mediaService.uploadMedia(file);
+                    media.setPost(post);
+                    newMedia.add(media);
+                }
+                post.getAttachments().addAll(newMedia);
+            }
+        }
         // Cập nhật updatedAt
         post.setUpdatedAt(LocalDateTime.now());
 
@@ -373,6 +408,7 @@ public class PostServiceImpl implements PostService {
 
         return postResponse;
     }
+
     @Override
     public List<CommentHierarchyResponse> getCommentHierarchy(Long postId) {
         Post post = postRepository.findById(postId)
@@ -472,5 +508,48 @@ public class PostServiceImpl implements PostService {
                         .build())
                 .replies(new ArrayList<>()) // Replies are not needed for this response
                 .build();
+    }
+
+    @Override
+    public PostResponse sharePost(Long postId, String content) {
+        // Retrieve the original post
+        Post originalPost = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Check sharing permissions based on privacy
+        if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post");
+        } else if (originalPost.getPrivacy() == Privacy.FRIENDS && !isFriend(originalPost.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post");
+        }
+
+        // Create the shared post
+        Post sharedPost = Post.builder()
+                .content(content) // Content of the shared post
+                .attachments(null) // Shared posts do not have attachments
+                .privacy(Privacy.PUBLIC) // Default privacy for shared posts
+                .createdBy(currentUser)
+                .createdAt(LocalDateTime.now())
+                .originalPost(originalPost) // Reference to the original post
+                .build();
+
+        // Save the shared post
+        Post savedPost = postRepository.save(sharedPost);
+
+        // Save the share information in the Share table
+        Share share = Share.builder()
+                .post(originalPost)
+                .sharedBy(currentUser)
+                .sharedAt(LocalDateTime.now())
+                .build();
+        shareRepository.save(share);
+
+        // Map the shared post to PostResponse
+        return postMapper.toPostResponse(savedPost);
     }
 }

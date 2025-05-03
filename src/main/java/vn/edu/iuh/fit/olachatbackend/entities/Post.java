@@ -6,6 +6,7 @@ import lombok.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -42,9 +43,13 @@ public class Post {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Like> likes;
+    private List<Like> likes = new ArrayList<>();
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference // Mark this as the parent reference
     private List<Comment> comments;
+
+    @ManyToOne
+    @JoinColumn(name = "original_post_id")
+    private Post originalPost;
 }

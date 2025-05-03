@@ -1,5 +1,6 @@
 package vn.edu.iuh.fit.olachatbackend.dtos.responses;
 
+import lombok.Builder;
 import lombok.Data;
 import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@Builder
 public class PostResponse {
     private Long postId;
     private User createdBy;
@@ -20,4 +22,6 @@ public class PostResponse {
     private LocalDateTime updatedAt;
     private List<User> likedUsers;
     private List<CommentHierarchyResponse> comments;
+    private Long originalPostId;
+    private PostResponse originalPost;
 }

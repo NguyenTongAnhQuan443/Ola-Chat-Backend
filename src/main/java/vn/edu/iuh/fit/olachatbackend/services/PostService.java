@@ -22,4 +22,5 @@ public interface PostService {
     List<CommentHierarchyResponse> deleteComment(Long commentId);
     List<CommentHierarchyResponse> addReplyToComment(Long commentId, String content);
     CommentHierarchyResponse updateComment(Long commentId, String content);
+    PostResponse sharePost(Long postId, String content);
 }

@@ -19,6 +19,8 @@ public interface PostMapper {
 
     @Mapping(target = "likedUsers", expression = "java(mapLikedUsers(post.getLikes()))")
     @Mapping(target = "comments", expression = "java(commentListToCommentHierarchyResponseList(post.getComments()))")
+    @Mapping(target = "originalPostId", source = "originalPost.postId")
+    @Mapping(target = "originalPost", expression = "java(post.getOriginalPost() != null ? toPostResponse(post.getOriginalPost()) : null)")
     PostResponse toPostResponse(Post post);
 
     List<PostResponse> toPostResponseList(List<Post> posts);
@@ -26,8 +28,12 @@ public interface PostMapper {
     List<CommentHierarchyResponse> commentListToCommentHierarchyResponseList(List<Comment> comments);
 
     default List<User> mapLikedUsers(List<Like> likes) {
+        if (likes == null) {
+            return List.of(); // Return an empty list if likes is null
+        }
         return likes.stream()
                 .map(Like::getLikedBy)
                 .collect(Collectors.toList());
     }
+
 }

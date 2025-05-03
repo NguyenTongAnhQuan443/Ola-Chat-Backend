@@ -135,4 +135,12 @@ public class PostController {
         CommentHierarchyResponse updatedComment = postService.updateComment(commentId, content);
         return ResponseEntity.ok(updatedComment);
     }
+
+    @PostMapping("/{postId}/share")
+    public ResponseEntity<PostResponse> sharePost(
+            @PathVariable Long postId,
+            @RequestParam(value = "content", required = false) String content) {
+        PostResponse postResponse = postService.sharePost(postId, content);
+        return ResponseEntity.ok(postResponse);
+    }
 }
