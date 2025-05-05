@@ -13,24 +13,16 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
  */
 
 import lombok.RequiredArgsConstructor;
-import org.bson.types.ObjectId;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.NotificationRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageResponseDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.Conversation;
-import vn.edu.iuh.fit.olachatbackend.entities.DeviceToken;
-import vn.edu.iuh.fit.olachatbackend.entities.Participant;
-import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.entities.Mention;
 import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
-import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
-import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.DeviceTokenRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
+import vn.edu.iuh.fit.olachatbackend.mappers.MessageMapper;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 import vn.edu.iuh.fit.olachatbackend.services.impl.UserServiceImpl;
@@ -44,67 +36,139 @@ public class ChatController {
     private final SimpMessagingTemplate template;
     private final MessageService messageService;
     private final NotificationService notificationService;
-    private final ConversationRepository conversationRepository;
     private final UserServiceImpl userServiceImpl;
-    private final ParticipantRepository participantRepository;
-    private final DeviceTokenRepository deviceTokenRepository;
+    private final MessageMapper messageMapper;
 
-    // Public chat
+    /**
+     * Handles messages sent to chat rooms
+     *
+     * @param messageDTO Message information from client
+     * @return MessageResponseDTO Processed message information
+     */
     @MessageMapping("/message")
-    @SendTo("/chatroom/public")
-    public MessageDTO receivePublicMessage(@Payload MessageDTO messageDTO) {
-        return messageDTO;
-    }
+    public MessageResponseDTO receiveGroupMessage(@Payload MessageRequest messageDTO) {
+        System.out.println("Message from client for chat room: " + messageDTO);
 
-    // Private chat
-    @MessageMapping("/private-message")
-    public MessageDTO receivePrivateMessage(@Payload MessageDTO messageDTO) {
-        System.out.println("Message from client: "+ messageDTO);
+        // Save message to database
         messageService.save(messageDTO);
 
+        // Broadcast message to all room members
+        template.convertAndSend("/chatroom/" + messageDTO.getConversationId(), messageDTO);
+
+        // Send notification to recipients
+        UserResponse sender = userServiceImpl.getUserById(messageDTO.getSenderId());
+        notificationService.notifyConversation(
+                messageDTO.getConversationId(),
+                messageDTO.getSenderId(),
+                "Tin nhắn mới",
+                "Bạn có tin nhắn từ " + sender.getDisplayName(),
+                NotificationType.MESSAGE
+        );
+
+        // Process @mentions
+        processMentions(messageDTO, sender);
+
+        return messageMapper.toResponseDTO(messageDTO);
+    }
+
+    /**
+     * Handles private messages between two users
+     *
+     * @param messageDTO Message information from client
+     * @return MessageResponseDTO Processed message information
+     */
+    @MessageMapping("/private-message")
+    public MessageResponseDTO receivePrivateMessage(@Payload MessageRequest messageDTO) {
+        System.out.println("Private message from client: " + messageDTO);
+
+        // Save message to database
+        messageService.save(messageDTO);
+
+        // Send message to specific recipient
         template.convertAndSend("/user/" + messageDTO.getConversationId() + "/private", messageDTO);
-        notifyRecipients(messageDTO);
-        return messageDTO;
+
+        // Send notification to recipient
+        UserResponse sender = userServiceImpl.getUserById(messageDTO.getSenderId());
+        notificationService.notifyConversation(
+                messageDTO.getConversationId(),
+                messageDTO.getSenderId(),
+                "Tin nhắn mới",
+                "Bạn có tin nhắn từ " + sender.getDisplayName(),
+                NotificationType.MESSAGE
+        );
+
+        return messageMapper.toResponseDTO(messageDTO);
     }
 
     @MessageMapping("/recall-message")
-    public void recallMessage(@Payload MessageDTO messageDTO) {
+    public void recallMessage(@Payload MessageRequest messageDTO) {
         System.out.println("Message Recall from client: "+ messageDTO);
-        MessageDTO recalled = messageService.recallMessage(messageDTO.getId(), messageDTO.getSenderId());
+        MessageRequest recalled = messageService.recallMessage(messageDTO.getId(), messageDTO.getSenderId());
         template.convertAndSend("/user/" + recalled.getConversationId() + "/private", recalled);
     }
 
-    private void notifyRecipients(MessageDTO messageDTO) {
-        // Tìm conversation
-        Conversation conversation = conversationRepository.findById(new ObjectId(messageDTO.getConversationId()))
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+    /**
+     * Processes @mentions in messages
+     *
+     * @param messageDTO Message information
+     * @param sender Message sender
+     */
+    private void processMentions(MessageRequest messageDTO, UserResponse sender) {
+        if (messageDTO.getMentions() == null || messageDTO.getMentions().isEmpty()) {
+            return;
+        }
 
-        // Tìm sender (để lấy displayName)
-        UserResponse sender = userServiceImpl.getUserById(messageDTO.getSenderId());
+        boolean mentionAll = checkMentionAll(messageDTO.getMentions());
 
-        // Lọc ra danh sách người nhận (tất cả trừ sender)
-        List<String> receiverIds = participantRepository.findParticipantByConversationId(conversation.getId()).stream()
-                .map(Participant::getUserId) // lấy userId từ mỗi Participant
-                .filter(userId -> !userId.equals(messageDTO.getSenderId())) // bỏ sender ra
-                .toList();
-
-        for (String receiverId : receiverIds) {
-            DeviceToken deviceToken = deviceTokenRepository.findByUserId(receiverId);
-            if (deviceToken != null) {
-                NotificationRequest notificationRequest = NotificationRequest.builder()
-                        .title("Tin nhắn mới")
-                        .body("Bạn có tin nhắn từ " + sender.getDisplayName())
-                        .token(deviceToken.getToken())
-                        .type(NotificationType.MESSAGE)
-                        .senderId(sender.getUserId())
-                        .receiverId(receiverId)
-                        .build();
-
-                notificationService.sendNotification(notificationRequest);
-            } else {
-                System.out.println("Không tìm thấy token cho user: " + receiverId);
+        if (mentionAll) {
+            // If @All, send notification to the entire group
+            notificationService.notifyConversation(
+                    messageDTO.getConversationId(),
+                    messageDTO.getSenderId(),
+                    "Có tin nhắn mới",
+                    sender.getDisplayName() + " đã nhắc tất cả trong nhóm",
+                    NotificationType.MESSAGE
+            );
+        } else {
+            // If individual mentions, send notifications to each mentioned user
+            for (Mention mention : messageDTO.getMentions()) {
+                if (isValidUserId(mention.getUserId())) {
+                    notificationService.notifyUserMentioned(
+                            messageDTO.getSenderId(),
+                            mention.getUserId(),
+                            messageDTO.getConversationId(),
+                            "Bạn được nhắc tên",
+                            sender.getDisplayName() + " đã nhắc bạn trong cuộc trò chuyện",
+                            NotificationType.MENTION
+                    );
+                }
             }
         }
+    }
+
+    /**
+     * Checks if there's a mention for the entire group
+     *
+     * @param mentions List of mentions
+     * @return true if @All is mentioned, false otherwise
+     */
+    private boolean checkMentionAll(List<Mention> mentions) {
+        for (Mention mention : mentions) {
+            if ("All".equalsIgnoreCase(mention.getDisplayName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Validates if a user ID is valid
+     *
+     * @param userId User ID
+     * @return true if ID is valid, false otherwise
+     */
+    private boolean isValidUserId(String userId) {
+        return userId != null && !userId.equals("0");
     }
 
 

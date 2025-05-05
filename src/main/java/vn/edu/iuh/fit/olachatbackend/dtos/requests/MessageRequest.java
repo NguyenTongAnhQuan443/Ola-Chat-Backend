@@ -4,7 +4,7 @@
  * Copyright (c) 2025 IUH. All rights reserved.
  */
 
-package vn.edu.iuh.fit.olachatbackend.dtos;
+package vn.edu.iuh.fit.olachatbackend.dtos.requests;
 /*
  * @description:
  * @author: Nguyen Thanh Nhut
@@ -14,6 +14,7 @@ package vn.edu.iuh.fit.olachatbackend.dtos;
 
 import lombok.*;
 import vn.edu.iuh.fit.olachatbackend.entities.DeliveryStatus;
+import vn.edu.iuh.fit.olachatbackend.entities.Mention;
 import vn.edu.iuh.fit.olachatbackend.entities.ReadStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
@@ -25,7 +26,7 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class MessageDTO {
+public class MessageRequest {
     private String id;
     private String senderId;
     private String conversationId;
@@ -37,4 +38,5 @@ public class MessageDTO {
     private List<ReadStatus> readStatus;
     private LocalDateTime createdAt;
     private boolean recalled;
+    private List<Mention> mentions;
 }

@@ -36,5 +36,6 @@ public class Participant {
     @Enumerated(EnumType.STRING)
     private ParticipantRole role;
     private LocalDateTime joinedAt;
+    private boolean muted = false;
 
 }

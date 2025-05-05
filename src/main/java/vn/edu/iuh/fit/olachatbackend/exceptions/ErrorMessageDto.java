@@ -1,8 +1,10 @@
 package vn.edu.iuh.fit.olachatbackend.exceptions;
 
-import lombok.Builder;
+import lombok.*;
 
+@Data
 @Builder
+@NoArgsConstructor
 public class ErrorMessageDto {
     private int statusCode;
     private String message;

@@ -47,5 +47,8 @@ public class File {
     @Column(name = "resource_type")
     private String resourceType;
 
+    @Column(name = "original_file_name", nullable = false)
+    private String originalFileName;
+
     private Long associatedIDMessageId;
 }

@@ -6,6 +6,7 @@ import lombok.Getter;
 public enum NotificationType {
     FRIEND_REQUEST("FRIEND_REQUEST"),
     MESSAGE("MESSAGE"),
+    MENTION("MENTION"),
     ALERT("ALERT"),
     PROMOTION("PROMOTION"),
     SYSTEM("SYSTEM");

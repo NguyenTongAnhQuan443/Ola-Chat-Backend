@@ -35,7 +35,6 @@ public class SecurityConfig {
             "/api/conversations", "/api/conversations/**",
             "/api/messages/**",
             "/ws", "/ws/**",
-            "/api/groups", "/api/groups/**",
             "/twilio/**",
             "/otp/**",
             "/api/login-history/**",
@@ -45,8 +44,7 @@ public class SecurityConfig {
             "/users"
     };
 
-    private final String[] ADMIN_ENDPOINTS = { "/api/users"
-
+    private final String[] ADMIN_ENDPOINTS = { "/api/users",
     };
 
     @Autowired

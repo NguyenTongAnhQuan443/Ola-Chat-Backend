@@ -42,11 +42,6 @@ public class UserController {
         this.friendService = friendService;
     }
 
-//    @PostMapping
-//    public User createUser(@RequestBody User user) {
-//        return userService.saveUser(user);
-//    }
-
     @GetMapping
     public MessageResponse<List<UserResponse>> getAllUsers() {
         return MessageResponse.<List<UserResponse>>builder()

@@ -20,7 +20,6 @@ import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.FileRepository;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
-import vn.edu.iuh.fit.olachatbackend.utils.FileUtils;
 
 import java.io.IOException;
 import java.util.Map;
@@ -70,18 +69,15 @@ public class FileController {
             // Get the file entity first to check its type
             File fileEntity = fileRepository.findByPublicId(publicId)
                     .orElseThrow(() -> new NotFoundException("File not found with public ID: " + publicId));
-            
+
             try {
                 byte[] fileData = cloudinaryService.downloadFile(publicId);
-                String fileType = fileEntity.getFileType();
-                String fileExtension = FileUtils.getExtensionFromMimeType(fileType);
-                String fileName = publicId + "." + fileExtension;
-
+                String originalFileName = fileEntity.getOriginalFileName();
                 return ResponseEntity.ok()
-                        .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                        .header("Content-Disposition", "attachment; filename=\"" + originalFileName + "\"")
                         .body(Map.of(
-                                "fileName", fileName,
-                                "location", downloadDir + fileName,
+                                "fileName", originalFileName,
+                                "location", downloadDir + originalFileName,
                                 "message", "Tải xuống thành công"
                         ));
             } catch (IOException e) {
@@ -111,7 +107,7 @@ public class FileController {
     @PostMapping("/upload/image")
     public ResponseEntity<String> uploadImage(
             @RequestParam("file") MultipartFile file)
-            throws IOException, IOException {
+            throws IOException {
         return ResponseEntity.ok(cloudinaryService.uploadImage(file));
     }
 

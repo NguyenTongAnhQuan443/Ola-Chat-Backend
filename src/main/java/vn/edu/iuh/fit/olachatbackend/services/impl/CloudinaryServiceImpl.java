@@ -21,7 +21,6 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.FileRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
-import vn.edu.iuh.fit.olachatbackend.utils.FileUtils;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -53,26 +52,26 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
-        
+
         // Determine the resource type based on file content type
         String resourceType = "image"; // default
         if (file.getContentType() != null) {
             String contentType = file.getContentType().toLowerCase();
-            if (contentType.contains("pdf") || contentType.contains("doc") || 
-                contentType.contains("xls") || contentType.contains("ppt") ||
-                contentType.contains("text") || contentType.contains("csv")) {
+            if (contentType.contains("pdf") || contentType.contains("doc") ||
+                    contentType.contains("xls") || contentType.contains("ppt") ||
+                    contentType.contains("text") || contentType.contains("csv")) {
                 resourceType = "raw";
             } else if (contentType.contains("video")) {
                 resourceType = "video";
             }
         }
-        
+
         Map<?, ?> uploadResult = cloudinary.uploader()
                 .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
-        
+
         String url = uploadResult.get("secure_url").toString();
         String publicId = uploadResult.get("public_id").toString();
-        
+
         File fileUpload = File.builder()
                 .fileUrl(url)
                 .fileType(file.getContentType())
@@ -82,8 +81,9 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 .associatedIDMessageId(associatedIDMessageId)
                 .publicId(publicId)
                 .resourceType(resourceType) // Store the resource type
+                .originalFileName(file.getOriginalFilename()) // Save original file name
                 .build();
-        
+
         fileRepository.save(fileUpload);
         return fileUpload;
     }
@@ -112,16 +112,15 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             throw new NotFoundException("File URL not found for public ID: " + publicId);
         }
 
-        // Determine the file extension based on the file type using our utility
-        String fileType = fileEntity.getFileType();
-        String fileExtension = FileUtils.getExtensionFromMimeType(fileType);
+        // Use the original file name
+        String originalFileName = fileEntity.getOriginalFileName();
 
         // Download the file using HttpURLConnection
         try {
             URL url = new URL(fileUrl);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
-            
+
             int responseCode = connection.getResponseCode();
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 throw new IOException("Failed to download file. HTTP response code: " + responseCode);
@@ -130,15 +129,14 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             try (InputStream inputStream = connection.getInputStream()) {
                 byte[] fileData = inputStream.readAllBytes();
 
-                // Save the file to the download directory with the correct extension
+                // Save the file to the download directory with the original file name
                 String saveDirectory = downloadDir;
                 java.io.File saveDir = new java.io.File(saveDirectory);
                 if (!saveDir.exists()) {
                     saveDir.mkdirs();
                 }
-                
-                String fileName = publicId + "." + fileExtension;
-                try (FileOutputStream fos = new FileOutputStream(saveDirectory + fileName)) {
+
+                try (FileOutputStream fos = new FileOutputStream(saveDirectory + originalFileName)) {
                     fos.write(fileData);
                 }
 
