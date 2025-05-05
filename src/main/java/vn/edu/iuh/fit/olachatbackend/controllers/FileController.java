@@ -21,6 +21,7 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.FileRepository;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map;
 
@@ -64,7 +65,8 @@ public class FileController {
 
     //download file
     @PostMapping("/download")
-    public ResponseEntity<?> downloadFile(@RequestParam("publicId") String publicId) {
+    public ResponseEntity<?> downloadFile(@RequestParam("publicId") String publicId,
+                                          @RequestParam("savePath") String savePath) {
         try {
             // Get the file entity first to check its type
             File fileEntity = fileRepository.findByPublicId(publicId)
@@ -73,11 +75,21 @@ public class FileController {
             try {
                 byte[] fileData = cloudinaryService.downloadFile(publicId);
                 String originalFileName = fileEntity.getOriginalFileName();
+
+                // Save the file to the specified savePath
+                java.io.File saveDir = new java.io.File(savePath);
+                if (!saveDir.exists()) {
+                    saveDir.mkdirs();
+                }
+                try (FileOutputStream fos = new FileOutputStream(savePath + java.io.File.separator + originalFileName)) {
+                    fos.write(fileData);
+                }
+
                 return ResponseEntity.ok()
                         .header("Content-Disposition", "attachment; filename=\"" + originalFileName + "\"")
                         .body(Map.of(
                                 "fileName", originalFileName,
-                                "location", downloadDir + originalFileName,
+                                "location", savePath + java.io.File.separator + originalFileName,
                                 "message", "Tải xuống thành công"
                         ));
             } catch (IOException e) {
