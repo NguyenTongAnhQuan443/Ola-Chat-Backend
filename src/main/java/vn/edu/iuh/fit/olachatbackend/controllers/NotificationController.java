@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.NotificationDTO;
@@ -24,6 +25,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.NotificationPageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.RegisterDeviceRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
+import vn.edu.iuh.fit.olachatbackend.utils.extractUserIdFromJwt;
 
 import java.util.List;
 
@@ -37,6 +39,24 @@ public class NotificationController {
     public ResponseEntity<MessageResponse<NotificationPageDTO>> getUserNotifications(
             @PathVariable String userId,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        NotificationPageDTO notificationPageDTO = notificationService.getNotificationsByUser(userId, pageable);
+
+        MessageResponse<NotificationPageDTO> response = MessageResponse.<NotificationPageDTO>builder()
+                .message("Lấy danh sách thông báo thành công!")
+                .data(notificationPageDTO)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<MessageResponse<NotificationPageDTO>> getMyNotifications(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        String token = authorizationHeader.replace("Bearer ", "");
+        String userId = extractUserIdFromJwt.extractUserIdFromJwt(token);
 
         NotificationPageDTO notificationPageDTO = notificationService.getNotificationsByUser(userId, pageable);
 
