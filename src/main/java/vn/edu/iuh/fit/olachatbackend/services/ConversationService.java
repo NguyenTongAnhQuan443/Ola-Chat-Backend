@@ -22,7 +22,7 @@ import java.util.List;
 
 public interface ConversationService {
     ConversationDTO createConversation(ConversationDTO conversationDTO);
-    List<ConversationResponse> getAllConversationsByUserId(String userId);
+    List<ConversationResponse> getAllConversationsByUser();
     void sendSystemMessageAndUpdateLast(String conversationId, String content);
     void updateLastMessage(ObjectId conversationId, Message newLastMessage);
 }
