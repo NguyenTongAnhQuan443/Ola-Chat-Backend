@@ -157,4 +157,13 @@ public class PostController {
         List<PostResponse> feed = postService.getFeed(page, size);
         return ResponseEntity.ok(feed);
     }
+
+    @GetMapping("/user/{userId}/posts")
+    public ResponseEntity<List<PostResponse>> getUserProfilePosts(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<PostResponse> posts = postService.getUserProfilePosts(userId, page, size);
+        return ResponseEntity.ok(posts);
+    }
 }
