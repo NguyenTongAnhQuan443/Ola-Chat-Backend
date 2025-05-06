@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
+import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.repositories.MediaRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
@@ -79,5 +80,15 @@ public class MediaServiceImpl implements MediaService {
                 mediaRepository.delete(media);
             }
         }
+    }
+
+    @Override
+    public List<Media> getMediaByUserId(String userId) {
+        // Kiểm tra user có tồn tại không
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+
+        // Truy vấn danh sách media theo user và sắp xếp
+        return mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(user);
     }
 }
