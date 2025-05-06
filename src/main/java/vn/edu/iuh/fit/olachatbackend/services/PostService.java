@@ -24,4 +24,5 @@ public interface PostService {
     List<CommentHierarchyResponse> addReplyToComment(Long commentId, String content);
     CommentHierarchyResponse updateComment(Long commentId, String content);
     PostResponse sharePost(Long postId, String content);
+    List<PostResponse> getFeed(int page, int size);
 }

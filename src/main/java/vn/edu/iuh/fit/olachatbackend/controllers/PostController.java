@@ -149,4 +149,12 @@ public class PostController {
         PostResponse postResponse = postService.sharePost(postId, content);
         return ResponseEntity.ok(postResponse);
     }
+
+    @GetMapping("/feed")
+    public ResponseEntity<List<PostResponse>> getFeed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<PostResponse> feed = postService.getFeed(page, size);
+        return ResponseEntity.ok(feed);
+    }
 }
