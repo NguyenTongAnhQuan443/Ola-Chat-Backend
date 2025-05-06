@@ -29,4 +29,13 @@ public class MediaController {
         List<Media> mediaList = mediaService.getMediaByUserId(userId);
         return ResponseEntity.ok(mediaList);
     }
+
+    @DeleteMapping("/{mediaId}")
+    public ResponseEntity<List<Media>> deleteMedia(
+            @PathVariable Long mediaId,
+            @RequestParam String userId) throws IOException {
+        // Xóa media và trả về danh sách media còn lại của user
+        List<Media> remainingMedia = mediaService.deleteMediaByIdAndReturnRemaining(mediaId, userId);
+        return ResponseEntity.ok(remainingMedia);
+    }
 }
