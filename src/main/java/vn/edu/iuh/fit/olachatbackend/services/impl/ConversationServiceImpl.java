@@ -14,14 +14,12 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.ConversationResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.Conversation;
-import vn.edu.iuh.fit.olachatbackend.entities.LastMessage;
-import vn.edu.iuh.fit.olachatbackend.entities.Message;
-import vn.edu.iuh.fit.olachatbackend.entities.Participant;
+import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
 import vn.edu.iuh.fit.olachatbackend.enums.ParticipantRole;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
@@ -73,31 +71,25 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public List<ConversationResponse> getAllConversationsByUserId(String userId) {
-        // Lấy tất cả participants liên quan đến userId đã cho
-        List<Participant> participants = participantRepository.findByUserId(userId);
+    public List<ConversationResponse> getAllConversationsByUser() {
+        User user = getCurrentUser();
 
-        // Lấy danh sách conversationId từ participants
+        // Get all participants by user
+        List<Participant> participants = participantRepository.findByUserId(user.getId());
+
+        // Get list conversationId from participants
         List<ObjectId> conversationIds = participants.stream()
                 .map(Participant::getConversationId)
-                .distinct() // Đảm bảo loại bỏ trùng lặp nếu có
+                .distinct() // Remove duplicate
                 .toList();
 
-        // Lấy tất cả các cuộc trò chuyện từ danh sách conversationIds
+        // Get all conversations
         List<Conversation> conversations = conversationRepository.findByIdIn(conversationIds);
 
-        // Tiến hành xây dựng danh sách ConversationDTO
+        // Create conversation response
         return conversations.stream().map(conversation -> {
-            // Lấy tất cả participants của mỗi conversation
+            // Get all participants of each conversation
             List<Participant> participantsInConversation = participantRepository.findByConversationId(conversation.getId());
-
-            // Lấy danh sách userIds từ participants trong cuộc trò chuyện này
-            List<String> userIds = participantsInConversation.stream()
-                    .map(Participant::getUserId)
-                    .distinct() // Loại bỏ trùng lặp nếu có
-                    .toList();
-
-            List<UserResponse> userResponses = userMapper.toUserResponseList(userRepository.findByIdIn(userIds));
 
             return ConversationResponse.builder()
                     .id(conversation.getId() != null ? conversation.getId().toHexString() : null)
@@ -107,7 +99,7 @@ public class ConversationServiceImpl implements ConversationService {
                     .lastMessage(conversation.getLastMessage())
                     .createdAt(conversation.getCreatedAt())
                     .updatedAt(conversation.getUpdatedAt())
-                    .users(userResponses)
+                    .participants(participantsInConversation)
                     .build();
         }).toList();
     }
@@ -172,6 +164,15 @@ public class ConversationServiceImpl implements ConversationService {
             case VOICE -> "[Tin nhắn thoại]";
             default -> "[Tin nhắn]";
         };
+    }
+
+    private User getCurrentUser() {
+        // Check user
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+
+        return userRepository.findByUsername(name)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
     }
 
 }

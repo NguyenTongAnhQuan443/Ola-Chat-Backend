@@ -32,7 +32,6 @@ public class SecurityConfig {
             "/auth/login", "/auth/introspect", "/auth/logout", "/auth/forgot-password", "/auth/reset-password","/app/**",
             "/auth/refresh",
             "/v3/api-docs/**", "/swagger-ui/**",
-            "/api/conversations", "/api/conversations/**",
             "/api/messages/**",
             "/ws", "/ws/**",
             "/twilio/**",

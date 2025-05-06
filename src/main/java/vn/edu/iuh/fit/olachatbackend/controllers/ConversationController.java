@@ -45,8 +45,10 @@ public class ConversationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConversationResponse>> getConversationsByUserId(@RequestParam("userId") String userId) {
-        return ResponseEntity.ok(conversationService.getAllConversationsByUserId(userId));
+    public ResponseEntity<MessageResponse<List<ConversationResponse>>> getConversationsByUser() {
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Lấy danh sách cuộc trò chuyện thành công", true, conversationService.getAllConversationsByUser())
+        );
     }
 
     @GetMapping("/{id}/messages")
