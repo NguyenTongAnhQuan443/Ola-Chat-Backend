@@ -16,10 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.ConversationResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import vn.edu.iuh.fit.olachatbackend.services.UserService;
@@ -58,8 +55,8 @@ public class ConversationController {
     }
 
     @GetMapping("/{conversationId}/users")
-    public ResponseEntity<List<UserResponse>> getUsersByConversation(@PathVariable String conversationId) {
-        List<UserResponse> users = userService.getUsersByConversationId(conversationId);
+    public ResponseEntity<List<ParticipantResponse>> getUsersByConversation(@PathVariable String conversationId) {
+        List<ParticipantResponse> users = userService.getUsersByConversationId(conversationId);
         return ResponseEntity.ok(users);
     }
 

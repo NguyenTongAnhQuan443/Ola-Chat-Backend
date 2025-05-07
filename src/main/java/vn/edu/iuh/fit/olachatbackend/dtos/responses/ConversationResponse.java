@@ -21,5 +21,5 @@ public class ConversationResponse {
     private LastMessage lastMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<Participant> participants;
+//    private List<ParticipantResponse> participants;
 }

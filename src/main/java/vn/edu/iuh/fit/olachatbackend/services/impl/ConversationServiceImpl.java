@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.ConversationResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.ParticipantResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
@@ -25,6 +26,7 @@ import vn.edu.iuh.fit.olachatbackend.enums.ParticipantRole;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ConversationMapperImpl;
+import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
@@ -44,6 +46,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final ConversationMapperImpl conversationMapperImpl;
+    private final ParticipantMapper participantMapper;
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
         Conversation conversation = Conversation.builder()
@@ -83,14 +86,14 @@ public class ConversationServiceImpl implements ConversationService {
                 .distinct() // Remove duplicate
                 .toList();
 
+
+
         // Get all conversations
         List<Conversation> conversations = conversationRepository.findByIdIn(conversationIds);
 
         // Create conversation response
         return conversations.stream().map(conversation -> {
             // Get all participants of each conversation
-            List<Participant> participantsInConversation = participantRepository.findByConversationId(conversation.getId());
-
             return ConversationResponse.builder()
                     .id(conversation.getId() != null ? conversation.getId().toHexString() : null)
                     .name(conversation.getName())
@@ -99,7 +102,7 @@ public class ConversationServiceImpl implements ConversationService {
                     .lastMessage(conversation.getLastMessage())
                     .createdAt(conversation.getCreatedAt())
                     .updatedAt(conversation.getUpdatedAt())
-                    .participants(participantsInConversation)
+//                    .participants(participantResponses)
                     .build();
         }).toList();
     }
