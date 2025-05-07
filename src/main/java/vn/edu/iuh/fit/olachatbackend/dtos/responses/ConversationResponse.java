@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import vn.edu.iuh.fit.olachatbackend.entities.LastMessage;
+import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
 
 import java.time.LocalDateTime;
@@ -20,5 +21,5 @@ public class ConversationResponse {
     private LastMessage lastMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<UserResponse> users;
+    private List<Participant> participants;
 }

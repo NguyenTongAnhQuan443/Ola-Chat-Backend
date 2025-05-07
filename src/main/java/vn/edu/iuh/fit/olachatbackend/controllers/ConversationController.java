@@ -15,8 +15,7 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.MessageResponseDTO;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.MessageRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.ConversationResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
@@ -46,13 +45,15 @@ public class ConversationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConversationResponse>> getConversationsByUserId(@RequestParam("userId") String userId) {
-        return ResponseEntity.ok(conversationService.getAllConversationsByUserId(userId));
+    public ResponseEntity<MessageResponse<List<ConversationResponse>>> getConversationsByUser() {
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Lấy danh sách cuộc trò chuyện thành công", true, conversationService.getAllConversationsByUser())
+        );
     }
 
     @GetMapping("/{id}/messages")
-    public ResponseEntity<List<MessageResponseDTO>> getMessagesByConversationId(@PathVariable String id) {
-        List<MessageResponseDTO> messages = messageService.getMessagesByConversationId(id);
+    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id) {
+        List<MessageDTO> messages = messageService.getMessagesByConversationId(id);
         return ResponseEntity.ok(messages);
     }
 

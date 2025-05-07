@@ -66,5 +66,14 @@ public class FriendController {
                 .build();
     }
 
+    @DeleteMapping("/requests/{receiverId}/cancel")
+    public MessageResponse<Void> cancelFriendRequest(@PathVariable String receiverId) {
+        friendRequestService.cancelSentRequest(receiverId);
+        return MessageResponse.<Void>builder()
+                .message("Đã hủy lời mời kết bạn.")
+                .build();
+    }
+
+
 
 }

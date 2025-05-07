@@ -14,21 +14,21 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.FriendRequestDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.NotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.FriendRequestResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
-import vn.edu.iuh.fit.olachatbackend.enums.FriendStatus;
-import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
-import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
+import vn.edu.iuh.fit.olachatbackend.enums.*;
 import vn.edu.iuh.fit.olachatbackend.exceptions.*;
-import vn.edu.iuh.fit.olachatbackend.repositories.DeviceTokenRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRequestRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.mappers.ConversationMapperImpl;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
+import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.FriendRequestService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 
@@ -44,12 +44,14 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     private final FriendRequestRepository friendRequestRepository;
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
-    private final DeviceTokenRepository deviceTokenRepository;
+    private final ConversationService conversationService;
     private final NotificationService notificationService;
+    private final ConversationMapperImpl conversationMapperImpl;
+    private final MessageRepository messageRepository;
+
 
     @Override
     public FriendRequestDTO sendFriendRequest(FriendRequestDTO friendRequestDTO) {
-
         String receiverId = friendRequestDTO.getReceiverId();
         String senderId = friendRequestDTO.getSenderId();
 
@@ -58,14 +60,46 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new NotFoundException("Người nhận không tồn tại."));
 
-        if (friendRequestRepository.existsBySenderAndReceiver(sender, receiver)) {
-            throw new ConflicException("Lời mời đã được gửi trước đó.");
+        Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findBySenderAndReceiver(sender, receiver);
+        if (existingRequestOpt.isPresent()) {
+            FriendRequest existingRequest = existingRequestOpt.get();
+            RequestStatus status = existingRequest.getStatus();
+
+            if (status == RequestStatus.PENDING) {
+                throw new ConflicException("Lời mời đã được gửi trước đó.");
+            }
+
+            if (status == RequestStatus.ACCEPTED) {
+                throw new ConflicException("Hai người đã là bạn bè.");
+            }
+
+            if (status == RequestStatus.REJECTED) {
+                LocalDateTime rejectedTime = existingRequest.getResponseAt();
+                if (rejectedTime != null && rejectedTime.plusHours(24).isAfter(LocalDateTime.now())) {
+                    throw new BadRequestException("Bạn chỉ có thể gửi lại lời mời sau 24 giờ kể từ khi bị từ chối.");
+                }
+
+                // Đã đủ 24 giờ → cập nhật lại lời mời cũ thay vì tạo mới
+                existingRequest.setStatus(RequestStatus.PENDING);
+                existingRequest.setResponseAt(null); // clear thời gian bị từ chối
+                FriendRequest updated = friendRequestRepository.save(existingRequest);
+
+                try {
+                    notificationService.notifyUser(receiverId, "Lời mời kết bạn",
+                            "Bạn có lời mời kết bạn từ " + sender.getDisplayName(),
+                            NotificationType.FRIEND_REQUEST, sender.getId());
+                } catch (Exception e) {
+                    log.error("Lỗi khi gửi thông báo {}", e.getMessage());
+                }
+
+                return FriendRequestDTO.builder()
+                        .senderId(updated.getSender().getId())
+                        .receiverId(updated.getReceiver().getId())
+                        .build();
+            }
         }
 
-        if (friendRequestRepository.areFriends(sender, receiver)) {
-            throw new ConflicException("Hai người đã là bạn bè.");
-        }
-
+        // Trường hợp chưa từng có lời mời
         try {
             notificationService.notifyUser(receiverId, "Lời mời kết bạn", "Bạn có lời mời kết bạn từ " + sender.getDisplayName(),
                     NotificationType.FRIEND_REQUEST, sender.getId());
@@ -78,14 +112,14 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         friendRequest.setReceiver(receiver);
         friendRequest.setStatus(RequestStatus.PENDING);
 
-        FriendRequest rs =  friendRequestRepository.save(friendRequest);
+        FriendRequest savedRequest = friendRequestRepository.save(friendRequest);
 
         return FriendRequestDTO.builder()
-                .senderId(rs.getSender().getId())
-                .receiverId(rs.getReceiver().getId())
+                .senderId(savedRequest.getSender().getId())
+                .receiverId(savedRequest.getReceiver().getId())
                 .build();
-
     }
+
 
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -106,7 +140,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         return requests.stream()
                 .map(req -> new FriendRequestResponse(
                         req.getId(),
-                        req.getReceiver().getId(),
+                        req.getSender().getId(),
                         req.getSender().getDisplayName(),
                         req.getSender().getAvatar()
                 ))
@@ -132,6 +166,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     }
 
     @Override
+    @Transactional
     public void acceptFriendRequest(String requestId) {
         User receiver  = getCurrentUser();
 
@@ -159,6 +194,25 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
         friendRequestRepository.save(friendRequest);
         friendRepository.save(friend);
+
+        // Create conversation
+        ConversationDTO conversation = ConversationDTO.builder()
+                .name("Cuộc trò chuyện của " + friendRequest.getSender().getDisplayName() + " và " + receiver.getDisplayName() )
+                .type(ConversationType.PRIVATE)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .userIds(List.of(friendRequest.getSender().getId(), receiver.getId()))
+                .build();
+
+        ConversationDTO savedConversation = conversationService.createConversation(conversation);
+
+        // Create last message
+        conversationService.sendSystemMessageAndUpdateLast(savedConversation.getId(), friendRequest.getSender().getDisplayName()
+                + " và " + receiver.getDisplayName() + " đã trở thành bạn bè.");
+
+        // Notify for sender
+        notificationService.notifyUser(friendRequest.getSender().getId(), "Chấp nhận lời mời kết bạn",
+                receiver.getDisplayName() + " đã chấp nhận lời mời kết bạn", NotificationType.FRIEND_REQUEST, receiver.getId());
     }
 
     @Override
@@ -205,4 +259,21 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         reverseRelationOpt.ifPresent(friendRepository::delete);
 
     }
+
+    @Override
+    public void cancelSentRequest(String receiverId) {
+        User sender = getCurrentUser();
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new NotFoundException("Người nhận không tồn tại."));
+
+        FriendRequest request = friendRequestRepository.findBySenderAndReceiver(sender, receiver)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy lời mời kết bạn."));
+
+        if (!request.getStatus().equals(RequestStatus.PENDING)) {
+            throw new BadRequestException("Chỉ có thể hủy lời mời đang chờ.");
+        }
+
+        friendRequestRepository.delete(request);
+    }
+
 }
