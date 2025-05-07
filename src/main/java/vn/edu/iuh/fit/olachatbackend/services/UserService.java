@@ -15,6 +15,7 @@ package vn.edu.iuh.fit.olachatbackend.services;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.ParticipantResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 
@@ -37,7 +38,7 @@ public interface UserService {
 
     void deleteUser(String userId);
 
-    List<UserResponse> getUsersByConversationId(String conversationId);
+    List<ParticipantResponse> getUsersByConversationId(String conversationId);
 
     UserResponse getMyInfo(String token);
 
