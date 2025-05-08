@@ -277,13 +277,14 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public void addMembers(ObjectId groupId, AddMemberRequest request) {
+        User currentUser = getCurrentUser();
         Conversation group = findGroupById(groupId);
 
         List<Participant> existingMembers = participantRepository.findByConversationId(groupId);
         Set<String> existingUserIds = existingMembers.stream().map(Participant::getUserId).collect(Collectors.toSet());
 
         List<Participant> newMembers = request.getUserIds().stream()
-                .filter(userId -> !existingUserIds.contains(userId)) // Remove user existed in group
+                .filter(userId -> !existingUserIds.contains(userId)) // Remove currentUser existed in group
                 .map(userId -> Participant.builder()
                         .conversationId(groupId)
                         .userId(userId)
@@ -299,6 +300,33 @@ public class GroupServiceImpl implements GroupService {
         participantRepository.saveAll(newMembers);
         group.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(group);
+
+        // Get currentUser for the system message
+        List<String> newUserIds = newMembers.stream()
+                .map(Participant::getUserId)
+                .collect(Collectors.toList());
+
+        List<User> addedUsers = userRepository.findAllById(newUserIds);
+        String addedUsernames = addedUsers.stream()
+                .map(User::getUsername)
+                .collect(Collectors.joining(", "));
+
+        String systemMsg = currentUser.getDisplayName() + " đã thêm " + addedUsernames + " vào nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
