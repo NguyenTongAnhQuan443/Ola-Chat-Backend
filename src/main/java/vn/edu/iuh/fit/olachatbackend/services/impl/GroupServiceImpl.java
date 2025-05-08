@@ -372,12 +372,15 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public void transferGroupOwner(ObjectId groupId, String newOwnerId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
-        validateOwner(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
+        validateOwner(groupId, currentUser.getId());
 
         Participant newOwner = findParticipantInGroup(groupId, newOwnerId);
+
+        User newOwnerUser = userRepository.findById(newOwnerId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Update role
         requester.setRole(ParticipantRole.MODERATOR);
@@ -385,6 +388,24 @@ public class GroupServiceImpl implements GroupService {
 
         participantRepository.save(requester);
         participantRepository.save(newOwner);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getUsername() + " đã chuyển quyền trưởng nhóm cho " + newOwnerUser.getDisplayName();
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
