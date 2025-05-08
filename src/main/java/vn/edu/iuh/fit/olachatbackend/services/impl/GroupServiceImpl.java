@@ -225,6 +225,24 @@ public class GroupServiceImpl implements GroupService {
                 .role(ParticipantRole.MEMBER)
                 .joinedAt(LocalDateTime.now())
                 .build());
+
+        String systemMsg = user.getDisplayName() + " đã tham gia nhóm";
+        Conversation group = findGroupById(groupId);
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                user.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
