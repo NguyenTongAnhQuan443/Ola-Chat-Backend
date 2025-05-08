@@ -27,12 +27,14 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.ParticipantResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.InternalServerErrorException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
+import vn.edu.iuh.fit.olachatbackend.repositories.LoginHistoryRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.*;
@@ -58,6 +60,7 @@ public class UserServiceImpl implements UserService {
     private final CloudinaryService cloudinaryService;
     private final EmailService emailService;
     private final ParticipantMapper participantMapper;
+    private final LoginHistoryRepository loginHistoryRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -126,6 +129,10 @@ public class UserServiceImpl implements UserService {
             User info = userRepository.findById(p.getUserId()).get();
             pResponse.setDisplayName(info.getDisplayName());
             pResponse.setAvatar(info.getAvatar());
+            boolean status = loginHistoryRepository
+                    .findTopByUserIdAndStatusOrderByLoginTimeDesc(p.getUserId(), LoginHistoryStatus.ONLINE)
+                    .isPresent();
+            pResponse.setStatus(status? LoginHistoryStatus.ONLINE : LoginHistoryStatus.OFFLINE);
             return pResponse;
         }).toList();
     }
