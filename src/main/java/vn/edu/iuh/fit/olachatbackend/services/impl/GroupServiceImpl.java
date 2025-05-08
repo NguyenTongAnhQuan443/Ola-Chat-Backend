@@ -308,7 +308,7 @@ public class GroupServiceImpl implements GroupService {
 
         List<User> addedUsers = userRepository.findAllById(newUserIds);
         String addedUsernames = addedUsers.stream()
-                .map(User::getUsername)
+                .map(User::getDisplayName)
                 .collect(Collectors.joining(", "));
 
         String systemMsg = currentUser.getDisplayName() + " đã thêm " + addedUsernames + " vào nhóm";
@@ -331,11 +331,15 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public void removeUserFromGroup(ObjectId groupId, String userId) {
+        User currentUser = getCurrentUser();
+
         // Find the group
         findGroupById(groupId);
 
         // Check if user exists in group
         Participant participant = findParticipantInGroup(groupId, userId);
+        User removedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Check remove user
         if (participant.getRole() == ParticipantRole.ADMIN) {
@@ -346,6 +350,24 @@ public class GroupServiceImpl implements GroupService {
 
         // remove
         participantRepository.delete(participant);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getUsername() + " đã xóa " + removedUser.getDisplayName() + " khỏi nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
