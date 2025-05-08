@@ -14,7 +14,6 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import lombok.*;
 import org.bson.types.ObjectId;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
