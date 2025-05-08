@@ -390,7 +390,7 @@ public class GroupServiceImpl implements GroupService {
         participantRepository.save(newOwner);
 
         Conversation group = findGroupById(groupId);
-        String systemMsg = currentUser.getUsername() + " đã chuyển quyền trưởng nhóm cho " + newOwnerUser.getDisplayName();
+        String systemMsg = currentUser.getDisplayName() + " đã chuyển quyền trưởng nhóm cho " + newOwnerUser.getDisplayName();
 
         // Send system message
         conversationService.sendSystemMessageAndUpdateLast(
@@ -434,7 +434,7 @@ public class GroupServiceImpl implements GroupService {
         participantRepository.save(member);
 
         Conversation group = findGroupById(groupId);
-        String systemMsg = currentUser.getUsername() + " đã thêm " + moderatorUser.getDisplayName() + " làm phó nhóm";
+        String systemMsg = currentUser.getDisplayName() + " đã thêm " + moderatorUser.getDisplayName() + " làm phó nhóm";
 
         // Send system message
         conversationService.sendSystemMessageAndUpdateLast(
@@ -454,11 +454,13 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public void removeModerator(ObjectId groupId, String userId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
 
-        validateOwner(groupId, user.getId());
+        validateOwner(groupId, currentUser.getId());
+        User moderatorUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Check moderator
         Participant deputy = findParticipantInGroup(groupId, userId);
@@ -470,6 +472,24 @@ public class GroupServiceImpl implements GroupService {
         // Remove moderator role: return to MEMBER
         deputy.setRole(ParticipantRole.MEMBER);
         participantRepository.save(deputy);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getDisplayName() + " đã xóa quyền phó nhóm của " + moderatorUser.getDisplayName();
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
 
