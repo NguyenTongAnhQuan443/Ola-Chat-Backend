@@ -31,4 +31,5 @@ public interface LoginHistoryRepository extends JpaRepository<LoginHistory, Stri
     List<String> findDistinctUserAgentsByUserId(@Param("userId") String userId);
 
     List<LoginHistory> findByStatus(LoginHistoryStatus status);
+    Optional<LoginHistory> findTopByUserIdAndStatusOrderByLoginTimeDesc(String userId, LoginHistoryStatus status);
 }

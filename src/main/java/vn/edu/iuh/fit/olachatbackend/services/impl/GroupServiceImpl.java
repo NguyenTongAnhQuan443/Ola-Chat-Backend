@@ -79,6 +79,11 @@ public class GroupServiceImpl implements GroupService {
 
         // Add members into group
         for (String userId : userIds) {
+            // Check if userId is person who create group
+            if (userId.equals(getCurrentUser().getId())) {
+                continue;
+            }
+
             participants.add(Participant.builder()
                     .conversationId(savedGroup.getId())
                     .userId(userId)

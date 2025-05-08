@@ -23,14 +23,18 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.IntrospectResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.ParticipantResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.InternalServerErrorException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
+import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
+import vn.edu.iuh.fit.olachatbackend.repositories.LoginHistoryRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.*;
@@ -55,6 +59,8 @@ public class UserServiceImpl implements UserService {
     private final RedisService redisService;
     private final CloudinaryService cloudinaryService;
     private final EmailService emailService;
+    private final ParticipantMapper participantMapper;
+    private final LoginHistoryRepository loginHistoryRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -104,16 +110,31 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserResponse> getUsersByConversationId(String conversationId) {
+    public List<ParticipantResponse> getUsersByConversationId(String conversationId) {
         List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
         List<String> userIds = participants.stream()
                 .map(Participant::getUserId)
                 .toList();
 
-        List<User> users = userRepository.findAllById(userIds);
+        System.out.println(userIds);
 
-        return users.stream().map(userMapper::toUserResponse).toList();
+        List<Participant> parts = participantRepository.findByConversationIdAndUserIdIn(
+                new ObjectId(conversationId),
+                userIds
+        );
+
+        return parts.stream().map(p -> {
+            ParticipantResponse pResponse = participantMapper.toParticipantResponse(p);
+            User info = userRepository.findById(p.getUserId()).get();
+            pResponse.setDisplayName(info.getDisplayName());
+            pResponse.setAvatar(info.getAvatar());
+            boolean status = loginHistoryRepository
+                    .findTopByUserIdAndStatusOrderByLoginTimeDesc(p.getUserId(), LoginHistoryStatus.ONLINE)
+                    .isPresent();
+            pResponse.setStatus(status? LoginHistoryStatus.ONLINE : LoginHistoryStatus.OFFLINE);
+            return pResponse;
+        }).toList();
     }
 
     @Override
