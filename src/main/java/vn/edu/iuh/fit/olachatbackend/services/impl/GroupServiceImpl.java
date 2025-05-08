@@ -255,6 +255,24 @@ public class GroupServiceImpl implements GroupService {
         }
 
         participantRepository.delete(participant);
+
+        String systemMsg = user.getDisplayName() + " đã rời khỏi nhóm";
+        Conversation group = findGroupById(groupId);
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                user.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
