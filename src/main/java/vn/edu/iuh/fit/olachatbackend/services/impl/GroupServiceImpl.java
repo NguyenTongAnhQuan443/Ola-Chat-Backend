@@ -179,12 +179,12 @@ public class GroupServiceImpl implements GroupService {
         if (request.getName() != null && !request.getName().trim().isEmpty()) {
             String oldName = group.getName();
             group.setName(request.getName());
-            systemMessage = currentUser.getUsername() + " đã đổi tên nhóm từ " + oldName + " thành " + request.getName();
+            systemMessage = currentUser.getDisplayName() + " đã đổi tên nhóm từ " + oldName + " thành " + request.getName();
         }
         if (request.getAvatar() != null) {
             group.setAvatar(request.getAvatar());
             if (systemMessage == null) {
-                systemMessage = currentUser.getUsername() + " đã thay đổi ảnh đại diện của nhóm";
+                systemMessage = currentUser.getDisplayName() + " đã thay đổi ảnh đại diện của nhóm";
             }
         }
         group.setUpdatedAt(LocalDateTime.now());
@@ -192,6 +192,15 @@ public class GroupServiceImpl implements GroupService {
 
         if (systemMessage != null) {
             conversationService.sendSystemMessageAndUpdateLast(groupId.toString(), systemMessage);
+
+            // Send notification
+            notificationService.notifyConversation(
+                    groupId.toString(),
+                    currentUser.getId(),
+                    group.getName(),
+                    systemMessage,
+                    NotificationType.GROUP
+            );
         }
     }
 
