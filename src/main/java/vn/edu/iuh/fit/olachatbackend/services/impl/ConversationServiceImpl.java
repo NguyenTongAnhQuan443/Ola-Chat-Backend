@@ -39,7 +39,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ConversationServiceImpl implements ConversationService {
+    public class ConversationServiceImpl implements ConversationService {
     private final ConversationRepository conversationRepository;
     private final ParticipantRepository participantRepository;
     private final UserMapper userMapper;
@@ -85,8 +85,6 @@ public class ConversationServiceImpl implements ConversationService {
                 .map(Participant::getConversationId)
                 .distinct() // Remove duplicate
                 .toList();
-
-
 
         // Get all conversations
         List<Conversation> conversations = conversationRepository.findByIdIn(conversationIds);

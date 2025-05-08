@@ -23,6 +23,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangeBackgroundRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupUpdateRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
+import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
 import vn.edu.iuh.fit.olachatbackend.enums.ParticipantRole;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -31,7 +32,9 @@ import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.GroupService;
+import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -47,9 +50,13 @@ public class GroupServiceImpl implements GroupService {
     private final ConversationMapper conversationMapper;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ConversationService conversationService;
+    private final NotificationService notificationService;
 
     @Override
     public ConversationDTO createGroup(String name, String avatar, List<String> userIds) {
+        User user = getCurrentUser();
+
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Tên nhóm không được để trống");
         }
@@ -93,6 +100,23 @@ public class GroupServiceImpl implements GroupService {
         }
 
         participantRepository.saveAll(participants);
+
+        String systemMsg = user.getDisplayName() + " đã tạo nhóm";
+
+        // Send system message for group creation
+        conversationService.sendSystemMessageAndUpdateLast(
+                savedGroup.getId().toString(),
+                systemMsg
+        );
+
+        // Send notification to all members
+        notificationService.notifyConversation(
+                savedGroup.getId().toString(),
+                user.getId(),
+                savedGroup.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
 
         return conversationMapper.toDTO(savedGroup);
     }
@@ -149,16 +173,26 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public void updateGroup(ObjectId groupId, GroupUpdateRequest request) {
         Conversation group = findGroupById(groupId);
+        User currentUser = getCurrentUser();
+        String systemMessage = null;
 
         if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            String oldName = group.getName();
             group.setName(request.getName());
+            systemMessage = currentUser.getUsername() + " đã đổi tên nhóm từ " + oldName + " thành " + request.getName();
         }
         if (request.getAvatar() != null) {
             group.setAvatar(request.getAvatar());
+            if (systemMessage == null) {
+                systemMessage = currentUser.getUsername() + " đã thay đổi ảnh đại diện của nhóm";
+            }
         }
         group.setUpdatedAt(LocalDateTime.now());
-
         conversationMapper.toDTO(conversationRepository.save(group));
+
+        if (systemMessage != null) {
+            conversationService.sendSystemMessageAndUpdateLast(groupId.toString(), systemMessage);
+        }
     }
 
     @Override
