@@ -410,12 +410,15 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public void setModerator(ObjectId groupId, String userId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
-        validateOwner(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
+        validateOwner(groupId, currentUser.getId());
 
         Participant member = findParticipantInGroup(groupId, userId);
+
+        User moderatorUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         if (member.getRole() == ParticipantRole.ADMIN) {
             throw new BadRequestException("Không thể gán quyền cho nhóm trưởng.");
@@ -429,6 +432,24 @@ public class GroupServiceImpl implements GroupService {
 
         member.setRole(ParticipantRole.MODERATOR);
         participantRepository.save(member);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getUsername() + " đã thêm " + moderatorUser.getDisplayName() + " làm phó nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
