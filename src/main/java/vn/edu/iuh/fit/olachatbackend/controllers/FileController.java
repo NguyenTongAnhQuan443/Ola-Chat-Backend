@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
@@ -34,21 +35,23 @@ public class FileController {
     }
 
     @PostMapping("/upload")
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
+                                        @RequestParam(value = "associatedIDMessageId", required = false) Long associatedIDMessageId) {
+        try {
+            File fileUpload = cloudinaryService.uploadFileAndSaveToDB(file, associatedIDMessageId);
+            return ResponseEntity.ok(fileUpload);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("Upload failed: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/upload_v2")
     public ResponseEntity<?> uploadFiles(@RequestParam("files") List<MultipartFile> files,
                                          @RequestParam(value = "associatedIDMessageId", required = false) Long associatedIDMessageId) {
         try {
-            // Lưu danh sách các tệp đã tải lên
-            List<File> uploadedFiles = files.stream()
-                    .map(file -> {
-                        try {
-                            return cloudinaryService.uploadFileAndSaveToDB(file, associatedIDMessageId);
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
-                        }
-                    })
-                    .toList();
-
-            return ResponseEntity.ok(uploadedFiles);
+            UploadFilesResponse response = cloudinaryService.uploadFileAndSaveToDB_v2(files, associatedIDMessageId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500)
                     .body("Upload failed: " + e.getMessage());

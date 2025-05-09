@@ -14,6 +14,7 @@ import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -27,6 +28,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -83,6 +85,56 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
         fileRepository.save(fileUpload);
         return fileUpload;
+    }
+
+    @Override
+    public UploadFilesResponse uploadFileAndSaveToDB_v2(List<MultipartFile> files, Long associatedIDMessageId) throws IOException {
+        var context = SecurityContextHolder.getContext();
+        String currentUsername = context.getAuthentication().getName();
+
+        User user = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
+
+        List<File> uploadedFiles = files.stream().map(file -> {
+            try {
+                // Determine the resource type based on file content type
+                String resourceType = "image"; // default
+                if (file.getContentType() != null) {
+                    String contentType = file.getContentType().toLowerCase();
+                    if (contentType.contains("pdf") || contentType.contains("doc") ||
+                            contentType.contains("xls") || contentType.contains("ppt") ||
+                            contentType.contains("text") || contentType.contains("csv")) {
+                        resourceType = "raw";
+                    } else if (contentType.contains("video")) {
+                        resourceType = "video";
+                    }
+                }
+
+                Map<?, ?> uploadResult = cloudinary.uploader()
+                        .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
+
+                String url = uploadResult.get("secure_url").toString();
+                String publicId = uploadResult.get("public_id").toString();
+
+                File fileUpload = File.builder()
+                        .fileUrl(url)
+                        .fileType(file.getContentType())
+                        .fileSize(file.getSize())
+                        .uploadedAt(LocalDateTime.now())
+                        .uploadedBy(user)
+                        .associatedIDMessageId(associatedIDMessageId)
+                        .publicId(publicId)
+                        .resourceType(resourceType) // Store the resource type
+                        .originalFileName(file.getOriginalFilename()) // Save original file name
+                        .build();
+
+                return fileRepository.save(fileUpload);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
+            }
+        }).toList();
+
+        return new UploadFilesResponse(user, uploadedFiles);
     }
 
     @Override
