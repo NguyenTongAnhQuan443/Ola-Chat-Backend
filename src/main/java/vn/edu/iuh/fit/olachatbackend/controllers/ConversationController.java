@@ -48,7 +48,7 @@ public class ConversationController {
         );
     }
 
-    @GetMapping("/{id}/messages")
+    @GetMapping(value = "/{id}/messages", produces = "application/json;charset=UTF-8")
     public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id) {
         List<MessageDTO> messages = messageService.getMessagesByConversationId(id);
         return ResponseEntity.ok(messages);
