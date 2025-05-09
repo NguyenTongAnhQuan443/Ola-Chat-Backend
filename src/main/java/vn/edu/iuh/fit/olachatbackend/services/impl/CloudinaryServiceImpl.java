@@ -11,10 +11,11 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;/*
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.FileResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -28,12 +29,11 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Service
 public class CloudinaryServiceImpl implements CloudinaryService {
-    @Value("${DOWNLOAD_DIR}")
-    private String downloadDir;
 
     private final Cloudinary cloudinary;
     private final FileRepository fileRepository;
@@ -88,6 +88,111 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return fileUpload;
     }
 
+    @Override
+    public UploadFilesResponse uploadFileAndSaveToDB_v2(List<MultipartFile> files, Long associatedIDMessageId) throws IOException {
+        var context = SecurityContextHolder.getContext();
+        String currentUsername = context.getAuthentication().getName();
+
+        User user = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
+
+        List<FileResponse> uploadedFiles = files.stream().map(file -> {
+            try {
+                String resourceType = "image"; // default
+                if (file.getContentType() != null) {
+                    String contentType = file.getContentType().toLowerCase();
+                    if (contentType.contains("pdf") || contentType.contains("doc") ||
+                            contentType.contains("xls") || contentType.contains("ppt") ||
+                            contentType.contains("text") || contentType.contains("csv")) {
+                        resourceType = "raw";
+                    } else if (contentType.contains("video")) {
+                        resourceType = "video";
+                    }
+                }
+
+                Map<?, ?> uploadResult = cloudinary.uploader()
+                        .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
+
+                String url = uploadResult.get("secure_url").toString();
+                String publicId = uploadResult.get("public_id").toString();
+
+                File fileUpload = File.builder()
+                        .fileUrl(url)
+                        .fileType(file.getContentType())
+                        .fileSize(file.getSize())
+                        .uploadedAt(LocalDateTime.now())
+                        .uploadedBy(user)
+                        .associatedIDMessageId(associatedIDMessageId)
+                        .publicId(publicId)
+                        .resourceType(resourceType)
+                        .originalFileName(file.getOriginalFilename())
+                        .build();
+
+                fileRepository.save(fileUpload);
+
+                return new FileResponse(
+                        fileUpload.getFileId(),
+                        fileUpload.getFileUrl(),
+                        fileUpload.getFileType(),
+                        fileUpload.getFileSize(),
+                        fileUpload.getPublicId(),
+                        fileUpload.getResourceType(),
+                        fileUpload.getOriginalFileName(),
+                        fileUpload.getAssociatedIDMessageId()
+                );
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
+            }
+        }).toList();
+
+        return new UploadFilesResponse(user, uploadedFiles);
+    }
+
+    @Override
+    public Map<String, Object> downloadFile(String publicId, String savePath) throws IOException {
+        // Lấy thông tin file từ DB
+        File fileEntity = fileRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new NotFoundException("File not found with public ID: " + publicId));
+
+        String fileUrl = fileEntity.getFileUrl();
+        String originalFileName = fileEntity.getOriginalFileName();
+
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            throw new NotFoundException("Không tìm thấy URL cho file có publicId: " + publicId);
+        }
+
+        // Tải file bằng HttpURLConnection
+        URL url = new URL(fileUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            throw new IOException("HTTP error code: " + responseCode);
+        }
+
+        byte[] fileData;
+        try (InputStream inputStream = connection.getInputStream()) {
+            fileData = inputStream.readAllBytes();
+
+            // Lưu file vào thư mục người dùng yêu cầu
+            java.io.File saveDir = new java.io.File(savePath);
+            if (!saveDir.exists()) {
+                saveDir.mkdirs();
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(savePath + java.io.File.separator + originalFileName)) {
+                fos.write(fileData);
+            }
+        }
+
+        return Map.of(
+                "fileName", originalFileName,
+                "location", savePath + java.io.File.separator + originalFileName,
+                "message", "Tải xuống thành công"
+        );
+    }
+
     //delete file and delete from database
     @Override
     public void deleteFile(String publicId) throws IOException {
@@ -97,54 +202,6 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         // Find the file in the database and delete it
         File file = fileRepository.findByPublicId(publicId).orElseThrow(() -> new NotFoundException("File not found"));
         fileRepository.delete(file);
-    }
-
-    //download file
-    @Override
-    public byte[] downloadFile(String publicId) throws Exception {
-        // Retrieve the file entity from the database
-        File fileEntity = fileRepository.findByPublicId(publicId)
-                .orElseThrow(() -> new NotFoundException("File not found"));
-
-        // Use the file URL directly from the database record instead of querying Cloudinary API
-        String fileUrl = fileEntity.getFileUrl();
-        if (fileUrl == null || fileUrl.isEmpty()) {
-            throw new NotFoundException("File URL not found for public ID: " + publicId);
-        }
-
-        // Use the original file name
-        String originalFileName = fileEntity.getOriginalFileName();
-
-        // Download the file using HttpURLConnection
-        try {
-            URL url = new URL(fileUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Failed to download file. HTTP response code: " + responseCode);
-            }
-
-            try (InputStream inputStream = connection.getInputStream()) {
-                byte[] fileData = inputStream.readAllBytes();
-
-                // Save the file to the download directory with the original file name
-                String saveDirectory = downloadDir;
-                java.io.File saveDir = new java.io.File(saveDirectory);
-                if (!saveDir.exists()) {
-                    saveDir.mkdirs();
-                }
-
-                try (FileOutputStream fos = new FileOutputStream(saveDirectory + originalFileName)) {
-                    fos.write(fileData);
-                }
-
-                return fileData;
-            }
-        } catch (IOException e) {
-            throw new IOException("Error downloading file from Cloudinary: " + e.getMessage(), e);
-        }
     }
 
     @Override
