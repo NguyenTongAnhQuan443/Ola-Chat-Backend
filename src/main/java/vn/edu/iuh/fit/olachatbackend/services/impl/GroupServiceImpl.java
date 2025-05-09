@@ -14,7 +14,6 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import lombok.*;
 import org.bson.types.ObjectId;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
@@ -23,6 +22,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangeBackgroundRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.GroupUpdateRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
+import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
 import vn.edu.iuh.fit.olachatbackend.enums.ParticipantRole;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -31,7 +31,9 @@ import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.GroupService;
+import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -47,9 +49,13 @@ public class GroupServiceImpl implements GroupService {
     private final ConversationMapper conversationMapper;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ConversationService conversationService;
+    private final NotificationService notificationService;
 
     @Override
     public ConversationDTO createGroup(String name, String avatar, List<String> userIds) {
+        User user = getCurrentUser();
+
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Tên nhóm không được để trống");
         }
@@ -79,6 +85,11 @@ public class GroupServiceImpl implements GroupService {
 
         // Add members into group
         for (String userId : userIds) {
+            // Check if userId is person who create group
+            if (userId.equals(getCurrentUser().getId())) {
+                continue;
+            }
+
             participants.add(Participant.builder()
                     .conversationId(savedGroup.getId())
                     .userId(userId)
@@ -88,6 +99,23 @@ public class GroupServiceImpl implements GroupService {
         }
 
         participantRepository.saveAll(participants);
+
+        String systemMsg = user.getDisplayName() + " đã tạo nhóm";
+
+        // Send system message for group creation
+        conversationService.sendSystemMessageAndUpdateLast(
+                savedGroup.getId().toString(),
+                systemMsg
+        );
+
+        // Send notification to all members
+        notificationService.notifyConversation(
+                savedGroup.getId().toString(),
+                user.getId(),
+                savedGroup.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
 
         return conversationMapper.toDTO(savedGroup);
     }
@@ -144,16 +172,35 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public void updateGroup(ObjectId groupId, GroupUpdateRequest request) {
         Conversation group = findGroupById(groupId);
+        User currentUser = getCurrentUser();
+        String systemMessage = null;
 
         if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            String oldName = group.getName();
             group.setName(request.getName());
+            systemMessage = currentUser.getDisplayName() + " đã đổi tên nhóm từ " + oldName + " thành " + request.getName();
         }
         if (request.getAvatar() != null) {
             group.setAvatar(request.getAvatar());
+            if (systemMessage == null) {
+                systemMessage = currentUser.getDisplayName() + " đã thay đổi ảnh đại diện của nhóm";
+            }
         }
         group.setUpdatedAt(LocalDateTime.now());
-
         conversationMapper.toDTO(conversationRepository.save(group));
+
+        if (systemMessage != null) {
+            conversationService.sendSystemMessageAndUpdateLast(groupId.toString(), systemMessage);
+
+            // Send notification
+            notificationService.notifyConversation(
+                    groupId.toString(),
+                    currentUser.getId(),
+                    group.getName(),
+                    systemMessage,
+                    NotificationType.GROUP
+            );
+        }
     }
 
     @Override
@@ -177,6 +224,24 @@ public class GroupServiceImpl implements GroupService {
                 .role(ParticipantRole.MEMBER)
                 .joinedAt(LocalDateTime.now())
                 .build());
+
+        String systemMsg = user.getDisplayName() + " đã tham gia nhóm";
+        Conversation group = findGroupById(groupId);
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                user.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
@@ -189,17 +254,36 @@ public class GroupServiceImpl implements GroupService {
         }
 
         participantRepository.delete(participant);
+
+        String systemMsg = user.getDisplayName() + " đã rời khỏi nhóm";
+        Conversation group = findGroupById(groupId);
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                user.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
     public void addMembers(ObjectId groupId, AddMemberRequest request) {
+        User currentUser = getCurrentUser();
         Conversation group = findGroupById(groupId);
 
         List<Participant> existingMembers = participantRepository.findByConversationId(groupId);
         Set<String> existingUserIds = existingMembers.stream().map(Participant::getUserId).collect(Collectors.toSet());
 
         List<Participant> newMembers = request.getUserIds().stream()
-                .filter(userId -> !existingUserIds.contains(userId)) // Remove user existed in group
+                .filter(userId -> !existingUserIds.contains(userId)) // Remove currentUser existed in group
                 .map(userId -> Participant.builder()
                         .conversationId(groupId)
                         .userId(userId)
@@ -215,15 +299,46 @@ public class GroupServiceImpl implements GroupService {
         participantRepository.saveAll(newMembers);
         group.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(group);
+
+        // Get currentUser for the system message
+        List<String> newUserIds = newMembers.stream()
+                .map(Participant::getUserId)
+                .collect(Collectors.toList());
+
+        List<User> addedUsers = userRepository.findAllById(newUserIds);
+        String addedUsernames = addedUsers.stream()
+                .map(User::getDisplayName)
+                .collect(Collectors.joining(", "));
+
+        String systemMsg = currentUser.getDisplayName() + " đã thêm " + addedUsernames + " vào nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
     public void removeUserFromGroup(ObjectId groupId, String userId) {
+        User currentUser = getCurrentUser();
+
         // Find the group
         findGroupById(groupId);
 
         // Check if user exists in group
         Participant participant = findParticipantInGroup(groupId, userId);
+        User removedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Check remove user
         if (participant.getRole() == ParticipantRole.ADMIN) {
@@ -234,16 +349,37 @@ public class GroupServiceImpl implements GroupService {
 
         // remove
         participantRepository.delete(participant);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getUsername() + " đã xóa " + removedUser.getDisplayName() + " khỏi nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
     public void transferGroupOwner(ObjectId groupId, String newOwnerId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
-        validateOwner(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
+        validateOwner(groupId, currentUser.getId());
 
         Participant newOwner = findParticipantInGroup(groupId, newOwnerId);
+
+        User newOwnerUser = userRepository.findById(newOwnerId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Update role
         requester.setRole(ParticipantRole.MODERATOR);
@@ -251,16 +387,37 @@ public class GroupServiceImpl implements GroupService {
 
         participantRepository.save(requester);
         participantRepository.save(newOwner);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getDisplayName() + " đã chuyển quyền trưởng nhóm cho " + newOwnerUser.getDisplayName();
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
     public void setModerator(ObjectId groupId, String userId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
-        validateOwner(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
+        validateOwner(groupId, currentUser.getId());
 
         Participant member = findParticipantInGroup(groupId, userId);
+
+        User moderatorUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         if (member.getRole() == ParticipantRole.ADMIN) {
             throw new BadRequestException("Không thể gán quyền cho nhóm trưởng.");
@@ -274,15 +431,35 @@ public class GroupServiceImpl implements GroupService {
 
         member.setRole(ParticipantRole.MODERATOR);
         participantRepository.save(member);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getDisplayName() + " đã thêm " + moderatorUser.getDisplayName() + " làm phó nhóm";
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
     @Override
     public void removeModerator(ObjectId groupId, String userId) {
-        User user = getCurrentUser();
+        User currentUser = getCurrentUser();
 
-        Participant requester = findParticipantInGroup(groupId, user.getId());
+        Participant requester = findParticipantInGroup(groupId, currentUser.getId());
 
-        validateOwner(groupId, user.getId());
+        validateOwner(groupId, currentUser.getId());
+        User moderatorUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
 
         // Check moderator
         Participant deputy = findParticipantInGroup(groupId, userId);
@@ -294,6 +471,24 @@ public class GroupServiceImpl implements GroupService {
         // Remove moderator role: return to MEMBER
         deputy.setRole(ParticipantRole.MEMBER);
         participantRepository.save(deputy);
+
+        Conversation group = findGroupById(groupId);
+        String systemMsg = currentUser.getDisplayName() + " đã xóa quyền phó nhóm của " + moderatorUser.getDisplayName();
+
+        // Send system message
+        conversationService.sendSystemMessageAndUpdateLast(
+                groupId.toString(),
+                systemMsg
+        );
+
+        // Send notification
+        notificationService.notifyConversation(
+                groupId.toString(),
+                currentUser.getId(),
+                group.getName(),
+                systemMsg,
+                NotificationType.GROUP
+        );
     }
 
 

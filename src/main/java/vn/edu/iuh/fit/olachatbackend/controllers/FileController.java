@@ -19,6 +19,7 @@ import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -67,30 +68,29 @@ public class FileController {
     }
 
     @PostMapping("/download")
-    public ResponseEntity<?> downloadFile(@RequestParam("publicId") String publicId,
-                                          @RequestParam("savePath") String savePath) {
-        try {
-            Map<String, Object> response = cloudinaryService.downloadFile(publicId, savePath);
-            return ResponseEntity.ok(response);
-        } catch (NotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of(
-                    "error", "Not Found",
-                    "message", e.getMessage()
-            ));
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body(Map.of(
-                    "error", "Download error",
-                    "message", "Tải file thất bại: " + e.getMessage()
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of(
-                    "error", "Internal Server Error",
-                    "message", "Lỗi khi xử lý yêu cầu tải file: " + e.getMessage()
-            ));
-        }
+public ResponseEntity<?> downloadFile(@RequestParam("publicId") String publicId,
+                                      @RequestParam("savePath") String savePath) {
+    try {
+        Map<String, Object> response = cloudinaryService.downloadFile(publicId, savePath);
+        return ResponseEntity.ok(response);
+    } catch (NotFoundException e) {
+        return ResponseEntity.status(404).body(Map.of(
+                "error", "Not Found",
+                "message", e.getMessage()
+        ));
+    } catch (IOException e) {
+        return ResponseEntity.status(500).body(Map.of(
+                "error", "Download error",
+                "message", "Tải file thất bại: " + e.getMessage()
+        ));
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(500).body(Map.of(
+                "error", "Internal Server Error",
+                "message", "Lỗi khi xử lý yêu cầu tải file: " + e.getMessage()
+        ));
     }
-
+}
 
     @PostMapping("/upload/image")
     public ResponseEntity<String> uploadImage(
