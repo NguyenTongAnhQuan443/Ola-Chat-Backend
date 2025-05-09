@@ -12,7 +12,6 @@ package vn.edu.iuh.fit.olachatbackend.dtos.responses;/*
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 
 import java.util.List;
@@ -22,5 +21,5 @@ import java.util.List;
 @NoArgsConstructor
 public class UploadFilesResponse {
     private User uploadedBy;
-    private List<File> files;
+    private List<FileResponse> files;
 }

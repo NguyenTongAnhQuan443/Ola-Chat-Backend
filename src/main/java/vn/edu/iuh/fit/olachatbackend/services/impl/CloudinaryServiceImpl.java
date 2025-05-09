@@ -14,6 +14,7 @@ import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.FileResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
@@ -95,9 +96,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
 
-        List<File> uploadedFiles = files.stream().map(file -> {
+        List<FileResponse> uploadedFiles = files.stream().map(file -> {
             try {
-                // Determine the resource type based on file content type
                 String resourceType = "image"; // default
                 if (file.getContentType() != null) {
                     String contentType = file.getContentType().toLowerCase();
@@ -124,11 +124,22 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                         .uploadedBy(user)
                         .associatedIDMessageId(associatedIDMessageId)
                         .publicId(publicId)
-                        .resourceType(resourceType) // Store the resource type
-                        .originalFileName(file.getOriginalFilename()) // Save original file name
+                        .resourceType(resourceType)
+                        .originalFileName(file.getOriginalFilename())
                         .build();
 
-                return fileRepository.save(fileUpload);
+                fileRepository.save(fileUpload);
+
+                return new FileResponse(
+                        fileUpload.getFileId(),
+                        fileUpload.getFileUrl(),
+                        fileUpload.getFileType(),
+                        fileUpload.getFileSize(),
+                        fileUpload.getPublicId(),
+                        fileUpload.getResourceType(),
+                        fileUpload.getOriginalFileName(),
+                        fileUpload.getAssociatedIDMessageId()
+                );
             } catch (IOException e) {
                 throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
             }
