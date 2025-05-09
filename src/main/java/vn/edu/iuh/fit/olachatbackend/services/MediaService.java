@@ -9,4 +9,6 @@ import java.util.List;
 public interface MediaService {
     Media uploadMedia(MultipartFile file) throws IOException;
     void deleteMediaFromCloudinary(List<Media> mediaList) throws IOException;
+    List<Media> getMediaByUserId(String userId);
+    List<Media> deleteMediaByIdAndReturnRemaining(Long mediaId, String userId) throws IOException;
 }

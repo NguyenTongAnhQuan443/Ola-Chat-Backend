@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
+import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.repositories.MediaRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
@@ -79,5 +80,43 @@ public class MediaServiceImpl implements MediaService {
                 mediaRepository.delete(media);
             }
         }
+    }
+
+    @Override
+    public List<Media> getMediaByUserId(String userId) {
+        // Kiểm tra user có tồn tại không
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+
+        // Truy vấn danh sách media theo user và sắp xếp
+        return mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(user);
+    }
+
+    @Override
+    public List<Media> deleteMediaByIdAndReturnRemaining(Long mediaId, String userId) throws IOException {
+        // Kiểm tra user có tồn tại không
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+
+        // Tìm media theo ID
+        Media media = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new NotFoundException("Media not found with ID: " + mediaId));
+
+        // Kiểm tra media có thuộc về user không
+        if (!media.getUploadedBy().getId().equals(userId)) {
+            throw new UnauthorizedException("Media does not belong to the user");
+        }
+
+        // Xóa media khỏi Cloudinary
+        String resourceType = media.getFileType() != null && media.getFileType().toLowerCase().contains("video")
+                ? "video"
+                : "image";
+        cloudinary.uploader().destroy(media.getPublicId(), ObjectUtils.asMap("resource_type", resourceType));
+
+        // Xóa media khỏi cơ sở dữ liệu
+        mediaRepository.delete(media);
+
+        // Trả về danh sách media còn lại của user
+        return mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(user);
     }
 }

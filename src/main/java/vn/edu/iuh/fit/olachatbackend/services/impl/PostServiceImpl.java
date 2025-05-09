@@ -1,5 +1,7 @@
 package vn.edu.iuh.fit.olachatbackend.services.impl;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -596,5 +598,74 @@ public class PostServiceImpl implements PostService {
 
         // Map the shared post to PostResponse
         return postMapper.toPostResponse(savedPost);
+    }
+
+    @Override
+    public List<PostResponse> getFeed(int page, int size) {
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Lấy danh sách bạn bè
+        List<String> friendIds = friendRepository.findByUser_IdOrFriend_Id(currentUser.getId(), currentUser.getId())
+                .stream()
+                .map(friend -> friend.getUser().getId().equals(currentUser.getId()) ? friend.getFriend().getId() : friend.getUser().getId())
+                .toList();
+
+        // Lấy bài viết của người dùng và bạn bè với điều kiện Privacy
+        List<Post> posts = postRepository.findFeedPosts(currentUser.getId(), friendIds, PageRequest.of(page, size))
+                .stream()
+                .filter(post -> {
+                    if (post.getCreatedBy().equals(currentUser)) {
+                        return true; // Hiển thị tất cả bài đăng của chính người dùng
+                    } else if (friendIds.contains(post.getCreatedBy().getId())) {
+                        return post.getPrivacy() == Privacy.PUBLIC || post.getPrivacy() == Privacy.FRIENDS;
+                    } else {
+                        return post.getPrivacy() == Privacy.PUBLIC;
+                    }
+                })
+                .toList();
+
+        // Map sang PostResponse
+        return posts.stream()
+                .map(postMapper::toPostResponse)
+                .toList();
+    }
+
+    @Override
+    public List<PostResponse> getUserProfilePosts(String userId, int page, int size) {
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Lấy người dùng được truy cập
+        User profileUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
+
+        // Kiểm tra mối quan hệ bạn bè
+        boolean isFriend = friendRepository.findByUserIdAndFriendId(currentUser.getId(), profileUser.getId())
+                .or(() -> friendRepository.findByUserIdAndFriendId(profileUser.getId(), currentUser.getId()))
+                .isPresent();
+
+        // Lấy danh sách bài đăng dựa trên quyền riêng tư
+        List<Post> posts;
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (currentUser.equals(profileUser)) {
+            // Chính chủ: Hiển thị tất cả bài đăng
+            posts = postRepository.findByCreatedBy(profileUser, pageRequest);
+        } else if (isFriend) {
+            // Bạn bè: Hiển thị bài đăng PUBLIC và FRIENDS
+            posts = postRepository.findByCreatedByAndPrivacyIn(profileUser, List.of(Privacy.PUBLIC, Privacy.FRIENDS), pageRequest);
+        } else {
+            // Không phải bạn bè: Chỉ hiển thị bài đăng PUBLIC
+            posts = postRepository.findByCreatedByAndPrivacy(profileUser, Privacy.PUBLIC, pageRequest);
+        }
+
+        // Map sang PostResponse
+        return posts.stream()
+                .map(postMapper::toPostResponse)
+                .toList();
     }
 }
