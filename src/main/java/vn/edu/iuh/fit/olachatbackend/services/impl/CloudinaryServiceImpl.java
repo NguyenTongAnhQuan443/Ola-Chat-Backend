@@ -32,8 +32,6 @@ import java.util.Map;
 
 @Service
 public class CloudinaryServiceImpl implements CloudinaryService {
-    @Value("${DOWNLOAD_DIR}")
-    private String downloadDir;
 
     private final Cloudinary cloudinary;
     private final FileRepository fileRepository;
@@ -88,6 +86,51 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         return fileUpload;
     }
 
+    @Override
+    public Map<String, Object> downloadFile(String publicId, String savePath) throws IOException {
+        // Lấy thông tin file từ DB
+        File fileEntity = fileRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new NotFoundException("File not found with public ID: " + publicId));
+
+        String fileUrl = fileEntity.getFileUrl();
+        String originalFileName = fileEntity.getOriginalFileName();
+
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            throw new NotFoundException("Không tìm thấy URL cho file có publicId: " + publicId);
+        }
+
+        // Tải file bằng HttpURLConnection
+        URL url = new URL(fileUrl);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            throw new IOException("HTTP error code: " + responseCode);
+        }
+
+        byte[] fileData;
+        try (InputStream inputStream = connection.getInputStream()) {
+            fileData = inputStream.readAllBytes();
+
+            // Lưu file vào thư mục người dùng yêu cầu
+            java.io.File saveDir = new java.io.File(savePath);
+            if (!saveDir.exists()) {
+                saveDir.mkdirs();
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(savePath + java.io.File.separator + originalFileName)) {
+                fos.write(fileData);
+            }
+        }
+
+        return Map.of(
+                "fileName", originalFileName,
+                "location", savePath + java.io.File.separator + originalFileName,
+                "message", "Tải xuống thành công"
+        );
+    }
+
     //delete file and delete from database
     @Override
     public void deleteFile(String publicId) throws IOException {
@@ -97,54 +140,6 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         // Find the file in the database and delete it
         File file = fileRepository.findByPublicId(publicId).orElseThrow(() -> new NotFoundException("File not found"));
         fileRepository.delete(file);
-    }
-
-    //download file
-    @Override
-    public byte[] downloadFile(String publicId) throws Exception {
-        // Retrieve the file entity from the database
-        File fileEntity = fileRepository.findByPublicId(publicId)
-                .orElseThrow(() -> new NotFoundException("File not found"));
-
-        // Use the file URL directly from the database record instead of querying Cloudinary API
-        String fileUrl = fileEntity.getFileUrl();
-        if (fileUrl == null || fileUrl.isEmpty()) {
-            throw new NotFoundException("File URL not found for public ID: " + publicId);
-        }
-
-        // Use the original file name
-        String originalFileName = fileEntity.getOriginalFileName();
-
-        // Download the file using HttpURLConnection
-        try {
-            URL url = new URL(fileUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Failed to download file. HTTP response code: " + responseCode);
-            }
-
-            try (InputStream inputStream = connection.getInputStream()) {
-                byte[] fileData = inputStream.readAllBytes();
-
-                // Save the file to the download directory with the original file name
-                String saveDirectory = downloadDir;
-                java.io.File saveDir = new java.io.File(saveDirectory);
-                if (!saveDir.exists()) {
-                    saveDir.mkdirs();
-                }
-
-                try (FileOutputStream fos = new FileOutputStream(saveDirectory + originalFileName)) {
-                    fos.write(fileData);
-                }
-
-                return fileData;
-            }
-        } catch (IOException e) {
-            throw new IOException("Error downloading file from Cloudinary: " + e.getMessage(), e);
-        }
     }
 
     @Override

@@ -1,19 +1,14 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.Like;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
-import vn.edu.iuh.fit.olachatbackend.entities.User;
-import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.LikeRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
-import vn.edu.iuh.fit.olachatbackend.services.CommentService;
+
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
@@ -25,19 +20,11 @@ import java.util.List;
 @RequestMapping("/api/posts")
 public class PostController {
     private final PostService postService;
-    private final UserRepository userRepository;
     private final MediaService mediaService;
-    private final PostMapper postMapper;
-    private final LikeRepository likeRepository;
-    @Autowired
-    private CommentService commentService;
 
-    public PostController(PostService postService, MediaService mediaService, PostMapper postMapper, LikeRepository likeRepository, UserRepository userRepository) {
+    public PostController(PostService postService, MediaService mediaService) {
         this.postService = postService;
         this.mediaService = mediaService;
-        this.postMapper = postMapper;
-        this.likeRepository = likeRepository;
-        this.userRepository = userRepository;
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -63,12 +50,6 @@ public class PostController {
         PostResponse postResponse = postService.getPostById(postId);
         return ResponseEntity.ok(postResponse);
     }
-
-//    @GetMapping
-//    public ResponseEntity<List<PostResponse>> getAllPosts() {
-//        List<PostResponse> postResponses = postService.getAllPosts();
-//        return ResponseEntity.ok(postResponses);
-//    }
 
     @GetMapping
     public ResponseEntity<List<PostResponse>> getUserPosts() {
