@@ -17,33 +17,37 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
-import vn.edu.iuh.fit.olachatbackend.repositories.FileRepository;
 import vn.edu.iuh.fit.olachatbackend.services.CloudinaryService;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
 @RestController
 @RequestMapping("/files")
 public class FileController {
     private final CloudinaryService cloudinaryService;
-    private final FileRepository fileRepository;
 
-    public FileController(CloudinaryService cloudinaryService, FileRepository fileRepository) {
+    public FileController(CloudinaryService cloudinaryService) {
         this.cloudinaryService = cloudinaryService;
-        this.fileRepository = fileRepository;
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
-                                        @RequestParam(value = "associatedIDMessageId", required = false) Long associatedIDMessageId) {
+    public ResponseEntity<?> uploadFiles(@RequestParam("files") List<MultipartFile> files,
+                                         @RequestParam(value = "associatedIDMessageId", required = false) Long associatedIDMessageId) {
         try {
-            File fileUpload = cloudinaryService.uploadFileAndSaveToDB(file, associatedIDMessageId);
-            return ResponseEntity.ok(fileUpload);
+            // Lưu danh sách các tệp đã tải lên
+            List<File> uploadedFiles = files.stream()
+                    .map(file -> {
+                        try {
+                            return cloudinaryService.uploadFileAndSaveToDB(file, associatedIDMessageId);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
+                        }
+                    })
+                    .toList();
+
+            return ResponseEntity.ok(uploadedFiles);
         } catch (Exception e) {
             return ResponseEntity.status(500)
                     .body("Upload failed: " + e.getMessage());
