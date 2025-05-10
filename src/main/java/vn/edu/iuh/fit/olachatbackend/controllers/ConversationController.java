@@ -20,6 +20,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import vn.edu.iuh.fit.olachatbackend.services.UserService;
+import vn.edu.iuh.fit.olachatbackend.utils.extractUserIdFromJwt;
 
 import java.util.List;
 
@@ -82,5 +83,20 @@ public class ConversationController {
                 .message("Lấy media thành công.")
                 .data(data)
                 .build();
+    }
+
+    @DeleteMapping("/{conversationId}")
+    public ResponseEntity<MessageResponse<Void>> deleteConversationForUser(
+            @PathVariable String conversationId,
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        String token = authHeader.replace("Bearer ", "");
+        String userId = extractUserIdFromJwt.extractUserIdFromJwt(token);
+
+        conversationService.softDeleteConversation(userId, conversationId);
+
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Đã xoá cuộc trò chuyện thành công", true, null)
+        );
     }
 }

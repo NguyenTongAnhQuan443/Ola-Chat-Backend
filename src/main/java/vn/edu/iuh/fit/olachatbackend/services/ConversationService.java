@@ -25,4 +25,6 @@ public interface ConversationService {
     List<ConversationResponse> getAllConversationsByUser();
     void sendSystemMessageAndUpdateLast(String conversationId, String content);
     void updateLastMessage(ObjectId conversationId, Message newLastMessage);
+    void softDeleteConversation(String userId, String conversationId);
+
 }

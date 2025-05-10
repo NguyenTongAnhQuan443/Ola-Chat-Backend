@@ -28,14 +28,13 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ConversationMapperImpl;
 import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +46,8 @@ import java.util.List;
     private final MessageRepository messageRepository;
     private final ConversationMapperImpl conversationMapperImpl;
     private final ParticipantMapper participantMapper;
+    private final DeletedConversationRepository deletedConversationRepository;
+
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
         Conversation conversation = Conversation.builder()
@@ -83,27 +84,33 @@ import java.util.List;
         // Get list conversationId from participants
         List<ObjectId> conversationIds = participants.stream()
                 .map(Participant::getConversationId)
-                .distinct() // Remove duplicate
+                .distinct()
                 .toList();
 
         // Get all conversations
         List<Conversation> conversations = conversationRepository.findByIdIn(conversationIds);
 
-        // Create conversation response
-        return conversations.stream().map(conversation -> {
-            // Get all participants of each conversation
-            return ConversationResponse.builder()
-                    .id(conversation.getId() != null ? conversation.getId().toHexString() : null)
-                    .name(conversation.getName())
-                    .avatar(conversation.getAvatar())
-                    .type(conversation.getType())
-                    .lastMessage(conversation.getLastMessage())
-                    .createdAt(conversation.getCreatedAt())
-                    .updatedAt(conversation.getUpdatedAt())
-//                    .participants(participantResponses)
-                    .build();
-        }).toList();
+        // Get list of conversations the user has deleted
+        List<DeletedConversation> deletedConversations = deletedConversationRepository.findByUserId(user.getId());
+        Set<String> deletedConversationIds = deletedConversations.stream()
+                .map(DeletedConversation::getConversationId)
+                .collect(Collectors.toSet());
+
+        // Create conversation response (exclude deleted)
+        return conversations.stream()
+                .filter(convo -> !deletedConversationIds.contains(convo.getId().toHexString()))
+                .map(conversation -> ConversationResponse.builder()
+                        .id(conversation.getId() != null ? conversation.getId().toHexString() : null)
+                        .name(conversation.getName())
+                        .avatar(conversation.getAvatar())
+                        .type(conversation.getType())
+                        .lastMessage(conversation.getLastMessage())
+                        .createdAt(conversation.getCreatedAt())
+                        .updatedAt(conversation.getUpdatedAt())
+                        .build())
+                .toList();
     }
+
 
     @Override
     public void sendSystemMessageAndUpdateLast(String conversationId, String content) {
@@ -150,6 +157,19 @@ import java.util.List;
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
     }
+
+    @Override
+    public void softDeleteConversation(String userId, String conversationId) {
+        if (!deletedConversationRepository.existsByUserIdAndConversationId(userId, conversationId)) {
+            DeletedConversation deleted = DeletedConversation.builder()
+                    .userId(userId)
+                    .conversationId(conversationId)
+                    .deletedAt(LocalDateTime.now())
+                    .build();
+            deletedConversationRepository.save(deleted);
+        }
+    }
+
 
     private String getLastMessagePreview(Message message) {
         if (message.isRecalled()) {
