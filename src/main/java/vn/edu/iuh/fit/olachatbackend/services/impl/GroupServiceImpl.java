@@ -109,13 +109,13 @@ public class GroupServiceImpl implements GroupService {
         );
 
         // Send notification to all members
-        notificationService.notifyConversation(
-                savedGroup.getId().toString(),
-                user.getId(),
-                savedGroup.getName(),
-                systemMsg,
-                NotificationType.GROUP
-        );
+            notificationService.notifyConversation(
+                    savedGroup.getId().toString(),
+                    user.getId(),
+                    savedGroup.getName(),
+                    systemMsg,
+                    NotificationType.GROUP
+            );
 
         return conversationMapper.toDTO(savedGroup);
     }
