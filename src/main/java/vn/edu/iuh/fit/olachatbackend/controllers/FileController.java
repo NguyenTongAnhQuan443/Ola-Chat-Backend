@@ -38,7 +38,7 @@ public class FileController {
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file,
                                         @RequestParam(value = "associatedIDMessageId", required = false) Long associatedIDMessageId) {
         try {
-            File fileUpload = cloudinaryService.uploadFileAndSaveToDB(file, associatedIDMessageId);
+            File fileUpload = cloudinaryService.uploadFileAndSaveToDB_v3(file, associatedIDMessageId);
             return ResponseEntity.ok(fileUpload);
         } catch (Exception e) {
             return ResponseEntity.status(500)
