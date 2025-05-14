@@ -1,12 +1,14 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserPostsResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 
@@ -29,7 +31,7 @@ public class PostController {
     }
 
     @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<MessageResponse<Post>> createPost(
+    public ResponseEntity<MessageResponse<PostResponse>> createPost(
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "privacy") String privacy,
             @RequestParam(value = "files", required = false) List<MultipartFile> files) throws IOException {
@@ -42,8 +44,8 @@ public class PostController {
             }
         }
 
-        Post createdPost = postService.createPost(content, privacy, mediaList);
-        MessageResponse<Post> response = MessageResponse.<Post>builder()
+        PostResponse createdPost = postService.createPost(content, privacy, mediaList);
+        MessageResponse<PostResponse> response = MessageResponse.<PostResponse>builder()
                 .message("Post created successfully")
                 .data(createdPost)
                 .build();
@@ -61,10 +63,13 @@ public class PostController {
     }
 
     @GetMapping
-    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserPosts() {
-        List<PostResponse> postResponses = postService.getUserPosts();
+    public ResponseEntity<MessageResponse<UserPostsResponse>> getUserPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        UserPostsResponse postResponses = postService.getUserPosts(page, size);
         return ResponseEntity.ok(
-                MessageResponse.<List<PostResponse>>builder()
+                MessageResponse.<UserPostsResponse>builder()
                         .message("User posts retrieved successfully")
                         .data(postResponses)
                         .build()
@@ -72,13 +77,14 @@ public class PostController {
     }
 
     @DeleteMapping("/{postId}")
-    public ResponseEntity<MessageResponse<List<PostResponse>>> deletePostAndReturnRemaining(@PathVariable Long postId) throws IOException {
-        List<PostResponse> postResponses = postService.deletePostByIdAndReturnRemaining(postId);
-        MessageResponse<List<PostResponse>> response = MessageResponse.<List<PostResponse>>builder()
-                .message("Post deleted successfully")
-                .data(postResponses)
-                .build();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<MessageResponse<String>> deletePost(@PathVariable Long postId) throws IOException {
+        postService.deletePostById(postId);
+        return ResponseEntity.ok(
+                MessageResponse.<String>builder()
+                        .message("Post deleted successfully")
+                        .data(null)
+                        .build()
+        );
     }
 
     @PutMapping(value = "/{postId}", consumes = "multipart/form-data")

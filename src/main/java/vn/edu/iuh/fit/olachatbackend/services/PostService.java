@@ -1,8 +1,10 @@
 package vn.edu.iuh.fit.olachatbackend.services;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserPostsResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 
@@ -10,11 +12,10 @@ import java.io.IOException;
 import java.util.List;
 
 public interface PostService {
-    Post createPost(String content, String privacy, List<Media> mediaList);
+    PostResponse createPost(String content, String privacy, List<Media> mediaList);
     PostResponse getPostById(Long postId);
-    //List<PostResponse> getAllPosts();
-    List<PostResponse> getUserPosts();
-    List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException;
+    UserPostsResponse getUserPosts(int page, int size);
+    void deletePostById(Long postId) throws IOException;
     PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     PostResponse likePost(Long postId);
     PostResponse toggleLikePost(Long postId);

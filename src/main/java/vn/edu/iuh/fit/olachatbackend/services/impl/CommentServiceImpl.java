@@ -12,7 +12,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;/*
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentedByResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostUserResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Comment;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.repositories.CommentRepository;
@@ -61,7 +61,7 @@ public class CommentServiceImpl implements CommentService {
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
-                .commentedBy(CommentedByResponse.builder()
+                .commentedBy(PostUserResponse.builder()
                         .username(comment.getCommentedBy().getUsername())
                         .displayName(comment.getCommentedBy().getDisplayName())
                         .avatar(comment.getCommentedBy().getAvatar())

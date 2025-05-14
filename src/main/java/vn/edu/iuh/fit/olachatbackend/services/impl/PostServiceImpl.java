@@ -1,18 +1,20 @@
 package vn.edu.iuh.fit.olachatbackend.services.impl;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentedByResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
+import vn.edu.iuh.fit.olachatbackend.mappers.MediaMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.CommentService;
@@ -23,6 +25,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PostServiceImpl implements PostService {
@@ -30,18 +33,21 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final MediaService mediaService;
     private final LikeRepository likeRepository;
-    private final PostMapper postMapper;
     private final FriendRepository friendRepository;
     private final CommentRepository commentRepository;
     private final CommentService commentService;
     private final ShareRepository shareRepository;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
+    @Autowired
+    private MediaMapper mediaMapper;
+    @Autowired
+    private PostMapper postMapper;
+
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
         this.likeRepository = likeRepository;
-        this.postMapper = postMapper;
         this.friendRepository = friendRepository;
         this.commentRepository = commentRepository;
         this.commentService = commentService;
@@ -49,17 +55,15 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public Post createPost(String content, String privacy, List<Media> mediaList) {
+    public PostResponse createPost(String content, String privacy, List<Media> mediaList) {
         if ((content == null || content.isEmpty()) && (mediaList == null || mediaList.isEmpty())) {
             throw new BadRequestException("Post must have either content or media.");
         }
 
-        // Retrieve the currently authenticated user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Create the post
         Post post = Post.builder()
                 .content(content)
                 .attachments(mediaList)
@@ -68,15 +72,15 @@ public class PostServiceImpl implements PostService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // Associate each media with the post
         if (mediaList != null) {
             for (Media media : mediaList) {
                 media.setPost(post);
             }
         }
 
-        // Save the post
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+
+        return postMapper.toPostResponse(savedPost);
     }
 
     @Override
@@ -101,132 +105,66 @@ public class PostServiceImpl implements PostService {
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
-        postResponse.setLikedUsers(likedUsers);
 
         return postResponse;
     }
 
     @Override
-    public List<PostResponse> getUserPosts() {
-        // Retrieve the currently authenticated user
+    public UserPostsResponse getUserPosts(int page, int size) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Fetch posts created by the current user
-        List<Post> posts = postRepository.findByCreatedBy(currentUser);
-        List<PostResponse> postResponses = new ArrayList<>();
+        // Tạo đối tượng PageRequest với sắp xếp mặc định là theo createdAt giảm dần
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        for (Post post : posts) {
-            // Fetch all comments and build hierarchy
+        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable); // Sửa ở đây: dùng Page<Post>
+
+        List<UserPostOnlyResponse> postResponses = postPage.stream().map(post -> {
             List<Comment> allComments = commentService.findAllByPost(post);
             List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-            // Fetch all users who liked the post
-            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                    .map(Like::getLikedBy)
-                    .toList();
-
-            // Map the post to PostResponse
-            PostResponse postResponse = postMapper.toPostResponse(post);
+            UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
             postResponse.setComments(commentHierarchy);
-            postResponse.setLikedUsers(likedUsers);
+            return postResponse;
+        }).collect(Collectors.toList());
 
-            postResponses.add(postResponse);
-        }
+        PostUserResponse createdBy = postMapper.userToPostUserResponse(currentUser);
 
-        return postResponses;
+        return new UserPostsResponse(
+                createdBy,
+                postResponses,
+                postPage.getTotalPages(),
+                postPage.getNumber() + 1,
+                postPage.getSize()
+        );
     }
 
-//    @Override
-//    public List<PostResponse> getAllPosts() {
-//        List<Post> posts = postRepository.findAll();
-//        List<PostResponse> postResponses = new ArrayList<>();
-//
-//        for (Post post : posts) {
-//            // Fetch all comments and build hierarchy
-//            List<Comment> allComments = commentService.findAllByPost(post);
-//            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-//
-//            // Fetch all users who liked the post
-//            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-//                    .map(Like::getLikedBy)
-//                    .toList();
-//
-//            // Map the post to PostResponse
-//            PostResponse postResponse = postMapper.toPostResponse(post);
-//            postResponse.setComments(commentHierarchy);
-//            postResponse.setLikedUsers(likedUsers);
-//
-//            postResponses.add(postResponse);
-//        }
-//
-//        return postResponses;
-//    }
 
     @Override
     @Transactional
-    public List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException {
-        // Fetch the post from the database
+    public void deletePostById(Long postId) throws IOException {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Check if the post is a shared post
         if (post.getOriginalPost() != null) {
-            // Retrieve the current user
             String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
             User currentUser = userRepository.findByUsername(currentUsername)
                     .orElseThrow(() -> new NotFoundException("User not found"));
 
-            // Delete the specific entry in the post_share table
             shareRepository.deleteByPostAndSharedBy(post.getOriginalPost(), currentUser);
         }
 
-        // Delete associated media using MediaService
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
             mediaService.deleteMediaFromCloudinary(post.getAttachments());
         }
 
-        // Delete all likes associated with the post
         likeRepository.deleteAllByPost(post);
-
-        // Delete all comments associated with the post
         commentRepository.deleteAllByPost(post);
-
-        // Delete the post from the database
         postRepository.delete(post);
-
-        // Fetch all remaining posts
-        List<Post> remainingPosts = postRepository.findAll();
-        List<PostResponse> postResponses = new ArrayList<>();
-
-        for (Post remainingPost : remainingPosts) {
-            // Fetch all comments and build hierarchy
-            List<Comment> allComments = commentService.findAllByPost(remainingPost);
-            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-            // Fetch all users who liked the post
-            List<User> likedUsers = likeRepository.findAllByPost(remainingPost).stream()
-                    .map(Like::getLikedBy)
-                    .toList();
-
-            // Map the post to PostResponse
-            PostResponse postResponse = postMapper.toPostResponse(remainingPost);
-            postResponse.setComments(commentHierarchy);
-            postResponse.setLikedUsers(likedUsers);
-
-            postResponses.add(postResponse);
-        }
-
-        return postResponses;
     }
 
     @Override
@@ -291,19 +229,88 @@ public class PostServiceImpl implements PostService {
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Lấy tất cả người dùng đã thích bài đăng
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
         // Map bài đăng sang PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
-        postResponse.setLikedUsers(likedUsers);
 
         return postResponse;
     }
 
+    @Override
+    public PostResponse sharePost(Long postId, String content) {
+        // Retrieve the post to be shared
+        Post postToShare = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // If the post has an original post (it's a shared post), check the permissions for sharing the original post
+        Post originalPost = postToShare.getOriginalPost(); // Directly get the original post
+
+        if (originalPost != null) {
+            // Check if the user has permission to share the original post
+            checkSharePermissions(originalPost, currentUser);
+
+            // Create a shared post with a reference to the original post
+            Post sharedPost = Post.builder()
+                    .content(content) // Content of the shared post
+                    .attachments(null) // Shared posts do not have attachments
+                    .privacy(Privacy.PUBLIC) // Default privacy for shared posts
+                    .createdBy(currentUser)
+                    .createdAt(LocalDateTime.now())
+                    .originalPost(originalPost) // Reference to the original post
+                    .build();
+
+            // Save the shared post
+            Post savedPost = postRepository.save(sharedPost);
+
+            // Save the share information in the Share table
+            Share share = Share.builder()
+                    .post(originalPost)
+                    .sharedBy(currentUser)
+                    .sharedAt(LocalDateTime.now())
+                    .build();
+            shareRepository.save(share);
+
+            // Map the shared post to PostResponse
+            return postMapper.toPostResponse(savedPost);
+        }
+
+        // If no original post, share the post itself (not a shared post)
+        Post sharedPost = Post.builder()
+                .content(content)
+                .attachments(null) // Shared posts do not have attachments
+                .privacy(Privacy.PUBLIC)
+                .createdBy(currentUser)
+                .createdAt(LocalDateTime.now())
+                .originalPost(postToShare) // Reference to the original post is the post itself
+                .build();
+
+        // Save the shared post
+        Post savedPost = postRepository.save(sharedPost);
+
+        // Save the share information in the Share table
+        Share share = Share.builder()
+                .post(postToShare)
+                .sharedBy(currentUser)
+                .sharedAt(LocalDateTime.now())
+                .build();
+        shareRepository.save(share);
+
+        // Map the shared post to PostResponse
+        return postMapper.toPostResponse(savedPost);
+    }
+
+    private void checkSharePermissions(Post originalPost, User currentUser) {
+        if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post");
+        } else if (originalPost.getPrivacy() == Privacy.FRIENDS && !isFriend(originalPost.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post");
+        }
+    }
 
     @Override
     public PostResponse likePost(Long postId) {
@@ -336,18 +343,12 @@ public class PostServiceImpl implements PostService {
                 .build();
         likeRepository.save(like);
 
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
         // Fetch all comments and build hierarchy
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setLikedUsers(likedUsers);
         postResponse.setComments(commentHierarchy);
 
         return postResponse;
@@ -397,18 +398,12 @@ public class PostServiceImpl implements PostService {
             likeRepository.save(like);
         }
 
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
         // Fetch all comments and build hierarchy
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
         // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setLikedUsers(likedUsers);
         postResponse.setComments(commentHierarchy);
 
         return postResponse;
@@ -548,56 +543,14 @@ public class PostServiceImpl implements PostService {
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
-                .commentedBy(CommentedByResponse.builder()
+                .commentedBy(PostUserResponse.builder()
+                        .userId(currentUser.getId())
                         .username(currentUser.getUsername())
                         .displayName(currentUser.getDisplayName())
                         .avatar(currentUser.getAvatar())
                         .build())
                 .replies(new ArrayList<>()) // Replies are not needed for this response
                 .build();
-    }
-
-    @Override
-    public PostResponse sharePost(Long postId, String content) {
-        // Retrieve the original post
-        Post originalPost = postRepository.findById(postId)
-                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
-
-        // Retrieve the current user
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new NotFoundException("User not found"));
-
-        // Check sharing permissions based on privacy
-        if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        } else if (originalPost.getPrivacy() == Privacy.FRIENDS && !isFriend(originalPost.getCreatedBy(), currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        }
-
-        // Create the shared post
-        Post sharedPost = Post.builder()
-                .content(content) // Content of the shared post
-                .attachments(null) // Shared posts do not have attachments
-                .privacy(Privacy.PUBLIC) // Default privacy for shared posts
-                .createdBy(currentUser)
-                .createdAt(LocalDateTime.now())
-                .originalPost(originalPost) // Reference to the original post
-                .build();
-
-        // Save the shared post
-        Post savedPost = postRepository.save(sharedPost);
-
-        // Save the share information in the Share table
-        Share share = Share.builder()
-                .post(originalPost)
-                .sharedBy(currentUser)
-                .sharedAt(LocalDateTime.now())
-                .build();
-        shareRepository.save(share);
-
-        // Map the shared post to PostResponse
-        return postMapper.toPostResponse(savedPost);
     }
 
     @Override
@@ -650,7 +603,7 @@ public class PostServiceImpl implements PostService {
                 .isPresent();
 
         // Lấy danh sách bài đăng dựa trên quyền riêng tư
-        List<Post> posts;
+        Page<Post> posts;
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         if (currentUser.equals(profileUser)) {
             // Chính chủ: Hiển thị tất cả bài đăng
