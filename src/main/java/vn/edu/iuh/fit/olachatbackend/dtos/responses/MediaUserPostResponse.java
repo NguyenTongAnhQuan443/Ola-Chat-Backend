@@ -18,11 +18,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class MediaPostResponse {
+public class MediaUserPostResponse {
     private String userId;
     private Long mediaId;
     private String fileUrl;
     private String fileType;
     private String originalFileName;
     private String publicId;
+    private Long postId;
 }

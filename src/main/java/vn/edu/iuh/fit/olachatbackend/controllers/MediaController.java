@@ -10,8 +10,11 @@ package vn.edu.iuh.fit.olachatbackend.controllers;/*
  */
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserMediaResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 
@@ -25,17 +28,28 @@ public class MediaController {
     private MediaService mediaService;
 
     @GetMapping("/user")
-    public ResponseEntity<List<Media>> getMediaByUserId(@RequestParam String userId) {
-        List<Media> mediaList = mediaService.getMediaByUserId(userId);
-        return ResponseEntity.ok(mediaList);
+    public ResponseEntity<MessageResponse<UserMediaResponse>> getMediaByUserId(@RequestParam String userId) {
+        UserMediaResponse mediaList = mediaService.getMediaByUserId(userId);
+        MessageResponse<UserMediaResponse> response = MessageResponse.<UserMediaResponse>builder()
+                .statusCode(HttpStatus.OK.value())
+                .message("User media retrieved successfully")
+                .success(true)
+                .data(mediaList)
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{mediaId}")
-    public ResponseEntity<List<Media>> deleteMedia(
-            @PathVariable Long mediaId,
-            @RequestParam String userId) throws IOException {
-        // Xóa media và trả về danh sách media còn lại của user
-        List<Media> remainingMedia = mediaService.deleteMediaByIdAndReturnRemaining(mediaId, userId);
-        return ResponseEntity.ok(remainingMedia);
+    public ResponseEntity<MessageResponse<Object>> deleteMedia(@PathVariable Long mediaId) throws IOException {
+        mediaService.deleteMediaById(mediaId);
+
+        MessageResponse<Object> response = MessageResponse.builder()
+                .statusCode(HttpStatus.OK.value())
+                .message("Media deleted successfully")
+                .success(true)
+                .data(null)
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 }

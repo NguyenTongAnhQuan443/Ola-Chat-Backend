@@ -62,6 +62,7 @@ public class CommentServiceImpl implements CommentService {
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .commentedBy(PostUserResponse.builder()
+                        .userId(comment.getCommentedBy().getId())
                         .username(comment.getCommentedBy().getUsername())
                         .displayName(comment.getCommentedBy().getDisplayName())
                         .avatar(comment.getCommentedBy().getAvatar())

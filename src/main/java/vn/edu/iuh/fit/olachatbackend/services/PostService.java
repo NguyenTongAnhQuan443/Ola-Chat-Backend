@@ -17,8 +17,8 @@ public interface PostService {
     UserPostsResponse getUserPosts(int page, int size);
     void deletePostById(Long postId) throws IOException;
     PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
-    PostResponse likePost(Long postId);
-    PostResponse toggleLikePost(Long postId);
+    void likePost(Long postId);
+    boolean toggleLikePost(Long postId);
     PostResponse addCommentToPost(Long postId, String content);
     List<CommentHierarchyResponse> getCommentHierarchy(Long postId);
     List<CommentHierarchyResponse> deleteComment(Long commentId);

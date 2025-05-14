@@ -345,48 +345,6 @@ public class PostServiceImpl implements PostService {
         return postMapper.toPostResponse(savedPost);
     }
 
-    @Override
-    public PostResponse likePost(Long postId) {
-        // Retrieve the post
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
-
-        // Retrieve the current user
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new NotFoundException("User not found"));
-
-        // Check access based on privacy
-        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to like this post");
-        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
-            throw new BadRequestException("You do not have permission to like this post");
-        }
-
-        // Check if the user already liked the post
-        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
-        if (alreadyLiked) {
-            throw new BadRequestException("You have already liked this post");
-        }
-
-        // Add the like
-        Like like = Like.builder()
-                .post(post)
-                .likedBy(currentUser)
-                .build();
-        likeRepository.save(like);
-
-        // Fetch all comments and build hierarchy
-        List<Comment> allComments = commentService.findAllByPost(post);
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-        // Map the post to PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
-    }
-
     // Helper method to check if two users are friends
     private boolean isFriend(User user1, User user2) {
         return friendRepository.findByUserIdAndFriendId(user1.getId(), user2.getId())
@@ -408,51 +366,64 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public PostResponse toggleLikePost(Long postId) {
-        // Retrieve the post
+    public void likePost(Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Retrieve the current user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Check access based on privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        }
+
+        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
+        if (alreadyLiked) {
+            throw new BadRequestException("You have already liked this post");
+        }
+
+        Like like = Like.builder()
+                .post(post)
+                .likedBy(currentUser)
+                .build();
+        likeRepository.save(like);
+    }
+
+    @Override
+    public boolean toggleLikePost(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
         if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to like/unlike this post");
         } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
             throw new BadRequestException("You do not have permission to like/unlike this post");
         }
 
-        // Check if the user already liked the post
         boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
 
         if (alreadyLiked) {
-            // Unlike the post
             Like like = likeRepository.findAllByPost(post).stream()
                     .filter(l -> l.getLikedBy().equals(currentUser))
                     .findFirst()
                     .orElseThrow(() -> new NotFoundException("Like not found"));
             likeRepository.delete(like);
+            return true; // Unliked
         } else {
-            // Like the post
             Like like = Like.builder()
                     .post(post)
                     .likedBy(currentUser)
                     .build();
             likeRepository.save(like);
+            return false; // Liked
         }
-
-        // Fetch all comments and build hierarchy
-        List<Comment> allComments = commentService.findAllByPost(post);
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-        // Map the post to PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
     }
 
     @Override

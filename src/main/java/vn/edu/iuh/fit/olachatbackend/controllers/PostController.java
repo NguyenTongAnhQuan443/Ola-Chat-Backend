@@ -1,7 +1,6 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,7 +9,6 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserPostsResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
-import vn.edu.iuh.fit.olachatbackend.entities.Post;
 
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
@@ -115,25 +113,26 @@ public class PostController {
                         .build()
         );
     }
-    
+
     @PostMapping("/{postId}/like")
-    public ResponseEntity<MessageResponse<PostResponse>> likePost(@PathVariable Long postId) {
-        PostResponse postResponse = postService.likePost(postId);
+    public ResponseEntity<MessageResponse<String>> likePost(@PathVariable Long postId) {
+        postService.likePost(postId); // Không cần nhận lại PostResponse
         return ResponseEntity.ok(
-                MessageResponse.<PostResponse>builder()
+                MessageResponse.<String>builder()
                         .message("Post liked successfully")
-                        .data(postResponse)
                         .build()
         );
     }
 
     @DeleteMapping("/{postId}/like")
-    public ResponseEntity<MessageResponse<PostResponse>> toggleLikePost(@PathVariable Long postId) {
-        PostResponse postResponse = postService.toggleLikePost(postId);
+    public ResponseEntity<MessageResponse<?>> toggleLikePost(@PathVariable Long postId) {
+        boolean isUnliked = postService.toggleLikePost(postId);
+
+        String message = isUnliked ? "Post unliked successfully" : "Post liked successfully";
+
         return ResponseEntity.ok(
-                MessageResponse.<PostResponse>builder()
-                        .message("Post unliked successfully")
-                        .data(postResponse)
+                MessageResponse.builder()
+                        .message(message)
                         .build()
         );
     }
