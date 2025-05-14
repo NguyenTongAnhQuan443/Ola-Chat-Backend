@@ -195,12 +195,16 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        if (post.getOriginalPost() != null) {
-            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-            User currentUser = userRepository.findByUsername(currentUsername)
-                    .orElseThrow(() -> new NotFoundException("User not found"));
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
-            shareRepository.deleteByPostAndSharedBy(post.getOriginalPost(), currentUser);
+        if (!post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to delete this post");
+        }
+
+        if (post.getOriginalPost() != null) {
+            shareRepository.deleteBySharedPost(post);
         }
 
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
@@ -227,6 +231,7 @@ public class PostServiceImpl implements PostService {
 
         Post originalPost = post.getOriginalPost();
         Long originalPostId = null;
+        boolean hideOriginalPost = false;
 
         if (originalPost != null) {
             // Là bài share => chỉ được sửa content
@@ -236,19 +241,16 @@ public class PostServiceImpl implements PostService {
                 throw new BadRequestException("Shared posts can only update content.");
             }
 
+            // Lưu lại originalPostId để phản hồi
             originalPostId = originalPost.getPostId();
 
-            boolean canViewOriginal = true;
+            // Kiểm tra quyền xem bài gốc
             if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
-                canViewOriginal = false;
+                hideOriginalPost = true;
             } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
                     !isFriend(originalPost.getCreatedBy(), currentUser) &&
                     !originalPost.getCreatedBy().equals(currentUser)) {
-                canViewOriginal = false;
-            }
-
-            if (!canViewOriginal) {
-                post.setOriginalPost(null); // Ẩn nội dung bài gốc
+                hideOriginalPost = true;
             }
 
         } else {
@@ -286,86 +288,61 @@ public class PostServiceImpl implements PostService {
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
 
-        // Gán lại originalPostId nếu cần (dù originalPost = null)
-        postResponse.setOriginalPostId(originalPostId);
+        // Gán lại originalPostId (ngay cả khi originalPost bị ẩn)
+        if (originalPostId != null) {
+            postResponse.setOriginalPostId(originalPostId);
+        }
+
+        // Nếu không có quyền xem bài gốc, thì ẩn nội dung bài gốc trong phản hồi
+        if (hideOriginalPost) {
+            postResponse.setOriginalPost(null);
+        }
 
         return postResponse;
     }
 
     @Override
     public PostResponse sharePost(Long postId, String content) {
-        // Retrieve the post to be shared
+        // Lấy bài viết cần chia sẻ
         Post postToShare = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Retrieve the current user
+        // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // If the post has an original post (it's a shared post), check the permissions for sharing the original post
-        Post originalPost = postToShare.getOriginalPost(); // Directly get the original post
+        // Xác định bài gốc thực sự (nếu là bài share thì lấy bài gốc của bài đó)
+        Post originalPost = postToShare.getOriginalPost() != null ? postToShare.getOriginalPost() : postToShare;
 
-        if (originalPost != null) {
-            // Check if the user has permission to share the original post
-            checkSharePermissions(originalPost, currentUser);
-
-            // Create a shared post with a reference to the original post
-            Post sharedPost = Post.builder()
-                    .content(content) // Content of the shared post
-                    .attachments(null) // Shared posts do not have attachments
-                    .privacy(Privacy.PUBLIC) // Default privacy for shared posts
-                    .createdBy(currentUser)
-                    .createdAt(LocalDateTime.now())
-                    .originalPost(originalPost) // Reference to the original post
-                    .build();
-
-            // Save the shared post
-            Post savedPost = postRepository.save(sharedPost);
-
-            // Save the share information in the Share table
-            Share share = Share.builder()
-                    .post(originalPost)
-                    .sharedBy(currentUser)
-                    .sharedAt(LocalDateTime.now())
-                    .build();
-            shareRepository.save(share);
-
-            // Map the shared post to PostResponse
-            return postMapper.toPostResponse(savedPost);
+        // Kiểm tra quyền chia sẻ
+        if (!canSharePost(originalPost, currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post.");
         }
 
-        // If no original post, share the post itself (not a shared post)
+        // Tạo bài share mới
         Post sharedPost = Post.builder()
                 .content(content)
-                .attachments(null) // Shared posts do not have attachments
-                .privacy(Privacy.PUBLIC)
+                .attachments(null) // Không đính kèm file trong bài share
+                .privacy(Privacy.PUBLIC) // Bài share mặc định là công khai
                 .createdBy(currentUser)
                 .createdAt(LocalDateTime.now())
-                .originalPost(postToShare) // Reference to the original post is the post itself
+                .originalPost(originalPost)
                 .build();
 
-        // Save the shared post
+        // Lưu bài share
         Post savedPost = postRepository.save(sharedPost);
 
-        // Save the share information in the Share table
+        // Lưu thông tin vào bảng share (với bài gốc thực sự)
         Share share = Share.builder()
-                .post(postToShare)
+                .post(originalPost)
+                .sharedPost(savedPost)
                 .sharedBy(currentUser)
                 .sharedAt(LocalDateTime.now())
                 .build();
         shareRepository.save(share);
 
-        // Map the shared post to PostResponse
         return postMapper.toPostResponse(savedPost);
-    }
-
-    private void checkSharePermissions(Post originalPost, User currentUser) {
-        if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        } else if (originalPost.getPrivacy() == Privacy.FRIENDS && !isFriend(originalPost.getCreatedBy(), currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        }
     }
 
     @Override
@@ -415,6 +392,19 @@ public class PostServiceImpl implements PostService {
         return friendRepository.findByUserIdAndFriendId(user1.getId(), user2.getId())
                 .or(() -> friendRepository.findByUserIdAndFriendId(user2.getId(), user1.getId()))
                 .isPresent();
+    }
+
+    private boolean canSharePost(Post post, User currentUser) {
+        // Người tạo được quyền chia sẻ bài của chính họ
+        if (post.getCreatedBy().equals(currentUser)) {
+            return true;
+        }
+
+        return switch (post.getPrivacy()) {
+            case PUBLIC -> true;
+            case FRIENDS -> isFriend(post.getCreatedBy(), currentUser);
+            case PRIVATE -> false;
+        };
     }
 
     @Override

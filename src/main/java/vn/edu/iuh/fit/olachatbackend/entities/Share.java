@@ -27,4 +27,8 @@ public class Share {
 
     @Column(name = "shared_at", nullable = false)
     private LocalDateTime sharedAt;
+
+    @ManyToOne
+    @JoinColumn(name = "shared_post_id", nullable = false)
+    private Post sharedPost;
 }

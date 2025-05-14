@@ -103,6 +103,19 @@ public class PostController {
         );
     }
 
+    @PostMapping("/{postId}/share")
+    public ResponseEntity<MessageResponse<PostResponse>> sharePost(
+            @PathVariable Long postId,
+            @RequestParam(value = "content", required = false) String content) {
+        PostResponse postResponse = postService.sharePost(postId, content);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post shared successfully")
+                        .data(postResponse)
+                        .build()
+        );
+    }
+    
     @PostMapping("/{postId}/like")
     public ResponseEntity<MessageResponse<PostResponse>> likePost(@PathVariable Long postId) {
         PostResponse postResponse = postService.likePost(postId);
@@ -183,19 +196,6 @@ public class PostController {
                 MessageResponse.<CommentHierarchyResponse>builder()
                         .message("Comment updated successfully")
                         .data(updatedComment)
-                        .build()
-        );
-    }
-
-    @PostMapping("/{postId}/share")
-    public ResponseEntity<MessageResponse<PostResponse>> sharePost(
-            @PathVariable Long postId,
-            @RequestParam(value = "content", required = false) String content) {
-        PostResponse postResponse = postService.sharePost(postId, content);
-        return ResponseEntity.ok(
-                MessageResponse.<PostResponse>builder()
-                        .message("Post shared successfully")
-                        .data(postResponse)
                         .build()
         );
     }

@@ -17,5 +17,5 @@ import vn.edu.iuh.fit.olachatbackend.entities.User;
 import java.util.List;
 
 public interface ShareRepository extends JpaRepository<Share, Long> {
-    void deleteByPostAndSharedBy(Post post, User sharedBy);
+    void deleteBySharedPost(Post sharedPost);
 }
