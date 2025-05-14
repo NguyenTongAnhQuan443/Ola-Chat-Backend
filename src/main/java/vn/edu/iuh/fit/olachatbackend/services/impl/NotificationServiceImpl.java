@@ -191,23 +191,50 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public void notifyConversation(String conversationId, String senderId, String title, String body, NotificationType type) {
-        Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
-                .orElseThrow(() -> new NotFoundException("Conversation not found"));
+//        Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
+//                .orElseThrow(() -> new NotFoundException("Conversation not found"));
+//
+//        UserResponse sender = userServiceImpl.getUserById(senderId);
+//
+//        List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
+//
+//        for (Participant participant : participants) {
+//            String receiverId = participant.getUserId();
+//
+//            // Skip sender and muted participants
+//            if (receiverId.equals(senderId) || participant.isMuted()) {
+//                continue;
+//            }
+//
+//            // Send to all devices of this user
+//            sendNotificationToAllDevices(receiverId, title, body, type, senderId);
+//        }
+        try {
+            Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
+                    .orElseThrow(() -> new NotFoundException("Conversation not found"));
 
-        UserResponse sender = userServiceImpl.getUserById(senderId);
+            UserResponse sender = userServiceImpl.getUserById(senderId);
 
-        List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
+            List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
-        for (Participant participant : participants) {
-            String receiverId = participant.getUserId();
+            for (Participant participant : participants) {
+                String receiverId = participant.getUserId();
 
-            // Skip sender and muted participants
-            if (receiverId.equals(senderId) || participant.isMuted()) {
-                continue;
+                // Skip sender and muted participants
+                if (receiverId.equals(senderId) || participant.isMuted()) {
+                    continue;
+                }
+
+                try {
+                    sendNotificationToAllDevices(receiverId, title, body, type, senderId);
+                } catch (Exception e) {
+                    // Log lỗi gửi riêng cho 1 user nhưng không làm gián đoạn vòng lặp
+                    System.err.println("Error sending to user " + receiverId + ": " + e.getMessage());
+                }
             }
-
-            // Send to all devices of this user
-            sendNotificationToAllDevices(receiverId, title, body, type, senderId);
+        } catch (Exception e) {
+            System.err.println("Error while notifying conversation: " + e.getMessage());
+            throw e;
         }
     }
 
