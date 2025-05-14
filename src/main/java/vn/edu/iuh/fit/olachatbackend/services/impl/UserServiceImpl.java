@@ -256,9 +256,11 @@ public class UserServiceImpl implements UserService {
         User targetUser = userOptional.get();
 
         String action;
+        boolean isFriend;
 
         if (friendRequestRepository.areFriends(currentUser, targetUser)) {
             action = "Nhắn tin";
+            isFriend = true;
         } else {
             Optional<FriendRequest> sentReq = friendRequestRepository.findBySenderAndReceiver(currentUser, targetUser);
             Optional<FriendRequest> receivedReq = friendRequestRepository.findBySenderAndReceiver(targetUser, currentUser);
@@ -270,6 +272,7 @@ public class UserServiceImpl implements UserService {
             } else {
                 action = "Kết bạn";
             }
+            isFriend = false;
         }
 
         return UserSearchResponse.builder()
@@ -281,6 +284,7 @@ public class UserServiceImpl implements UserService {
                 .bio(targetUser.getBio())
                 .dob(targetUser.getDob())
                 .friendAction(action)
+                .isFriend(isFriend)
                 .build();
     }
 

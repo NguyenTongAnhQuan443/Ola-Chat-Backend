@@ -30,5 +30,6 @@ public class UserSearchResponse {
     private String bio;
     private LocalDateTime dob;
     private String friendAction; // "Kết bạn", "Hủy kết bạn", "Đồng ý", "Nhắn tin"
+    private boolean isFriend;
 }
 
