@@ -85,29 +85,51 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PostResponse getPostById(Long postId) {
-        // Retrieve the post from the database
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Retrieve the current user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Check access based on privacy
         if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to access this post");
-        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser) && !post.getCreatedBy().equals(currentUser)) {
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to access this post");
         }
 
-        // Fetch all comments and build hierarchy
+        Post originalPost = post.getOriginalPost();
+        Long originalPostId = null;
+
+        if (originalPost != null) {
+            originalPostId = originalPost.getPostId(); // lưu lại ID
+
+            boolean canViewOriginal = true;
+
+            if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                    !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            }
+
+            if (!canViewOriginal) {
+                post.setOriginalPost(null); // chặn xem chi tiết
+            }
+        }
+
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
+
+        // Gán originalPostId dù originalPost đã bị null
+        postResponse.setOriginalPostId(originalPostId);
 
         return postResponse;
     }
@@ -118,17 +140,41 @@ public class PostServiceImpl implements PostService {
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Tạo đối tượng PageRequest với sắp xếp mặc định là theo createdAt giảm dần
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable); // Sửa ở đây: dùng Page<Post>
+        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable);
 
         List<UserPostOnlyResponse> postResponses = postPage.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+            Long originalPostId = null;
+
+            if (originalPost != null) {
+                originalPostId = originalPost.getPostId();
+
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null); // Xoá chi tiết bài gốc
+                }
+            }
+
             List<Comment> allComments = commentService.findAllByPost(post);
             List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
             UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
             postResponse.setComments(commentHierarchy);
+
+            // Gán originalPostId dù originalPost bị ẩn
+            postResponse.setOriginalPostId(originalPostId);
+
             return postResponse;
         }).collect(Collectors.toList());
 
@@ -142,7 +188,6 @@ public class PostServiceImpl implements PostService {
                 postPage.getSize()
         );
     }
-
 
     @Override
     @Transactional
@@ -169,36 +214,49 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException {
-        // Lấy bài đăng từ DB
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Kiểm tra quyền sở hữu bài đăng
         if (!post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to update this post");
         }
 
-        // Kiểm tra nếu bài đăng là bài share
-        if (post.getOriginalPost() != null) {
-            // Chỉ cho phép cập nhật content
+        Post originalPost = post.getOriginalPost();
+        Long originalPostId = null;
+
+        if (originalPost != null) {
+            // Là bài share => chỉ được sửa content
             if (content != null && !content.isEmpty()) {
                 post.setContent(content);
             } else {
                 throw new BadRequestException("Shared posts can only update content.");
             }
-        } else {
 
-            // Cập nhật content nếu có
+            originalPostId = originalPost.getPostId();
+
+            boolean canViewOriginal = true;
+            if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                    !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            }
+
+            if (!canViewOriginal) {
+                post.setOriginalPost(null); // Ẩn nội dung bài gốc
+            }
+
+        } else {
+            // Là bài viết bình thường
             if (content != null && !content.isEmpty()) {
                 post.setContent(content);
             }
 
-            // Xóa media nếu có filesToDelete
             if (filesToDelete != null && !filesToDelete.isEmpty()) {
                 List<Media> mediaToDelete = post.getAttachments().stream()
                         .filter(media -> filesToDelete.contains(media.getPublicId()))
@@ -208,7 +266,6 @@ public class PostServiceImpl implements PostService {
                 post.getAttachments().removeAll(mediaToDelete);
             }
 
-            // Thêm media mới nếu có newFiles
             if (newFiles != null && !newFiles.isEmpty()) {
                 List<Media> newMedia = new ArrayList<>();
                 for (MultipartFile file : newFiles) {
@@ -219,19 +276,18 @@ public class PostServiceImpl implements PostService {
                 post.getAttachments().addAll(newMedia);
             }
         }
-        // Cập nhật updatedAt
-        post.setUpdatedAt(LocalDateTime.now());
 
-        // Lưu bài đăng
+        post.setUpdatedAt(LocalDateTime.now());
         postRepository.save(post);
 
-        // Lấy tất cả bình luận của bài đăng và xây dựng cấu trúc phân cấp
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Map bài đăng sang PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
+
+        // Gán lại originalPostId nếu cần (dù originalPost = null)
+        postResponse.setOriginalPostId(originalPostId);
 
         return postResponse;
     }
