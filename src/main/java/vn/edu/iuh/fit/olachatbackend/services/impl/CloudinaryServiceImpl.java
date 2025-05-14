@@ -29,8 +29,10 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class CloudinaryServiceImpl implements CloudinaryService {
@@ -46,31 +48,59 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
 
     @Override
-    public File uploadFileAndSaveToDB(MultipartFile file, Long associatedIDMessageId) throws IOException {
+    public File uploadFileAndSaveToDB_v3(MultipartFile file, Long associatedIDMessageId) throws IOException {
         var context = SecurityContextHolder.getContext();
         String currentUsername = context.getAuthentication().getName();
 
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
 
-        // Determine the resource type based on file content type
         String resourceType = "image"; // default
-        if (file.getContentType() != null) {
-            String contentType = file.getContentType().toLowerCase();
-            if (contentType.contains("pdf") || contentType.contains("doc") ||
-                    contentType.contains("xls") || contentType.contains("ppt") ||
-                    contentType.contains("text") || contentType.contains("csv")) {
-                resourceType = "raw";
-            } else if (contentType.contains("video")) {
-                resourceType = "video";
-            }
+        String contentType = file.getContentType() != null ? file.getContentType().toLowerCase() : "";
+
+        if (contentType.contains("pdf") || contentType.contains("doc") ||
+                contentType.contains("xls") || contentType.contains("ppt") ||
+                contentType.contains("text") || contentType.contains("csv")) {
+            resourceType = "raw";
+        } else if (contentType.contains("video")) {
+            resourceType = "video";
         }
 
-        Map<?, ?> uploadResult = cloudinary.uploader()
-                .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
+        // Lấy đuôi file (extension) từ tên gốc
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        String baseFilename = "unknown";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            int lastDotIndex = originalFilename.lastIndexOf(".");
+            baseFilename = originalFilename.substring(0, lastDotIndex);
+            extension = originalFilename.substring(lastDotIndex); // giữ cả dấu chấm
+        } else if (originalFilename != null) {
+            baseFilename = originalFilename;
+        }
+
+        // Chuẩn hóa baseFilename (không bao gồm đuôi)
+        String sanitizedBaseFilename = baseFilename.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
+
+        // Tạo public_id có định dạng: sanitizedBaseFilename--UUID + extension
+        String publicId;
+        if ("raw".equals(resourceType)) {
+            publicId = sanitizedBaseFilename + "--" + UUID.randomUUID() + extension;
+        } else {
+            publicId = sanitizedBaseFilename + "--" + UUID.randomUUID(); // Không có đuôi
+        }
+
+        // Upload lên Cloudinary, gắn public_id rõ ràng
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                file.getBytes(),
+                ObjectUtils.asMap(
+                        "resource_type", resourceType,
+                        "public_id", publicId
+                )
+        );
 
         String url = uploadResult.get("secure_url").toString();
-        String publicId = uploadResult.get("public_id").toString();
+        String returnedPublicId = uploadResult.get("public_id").toString();
 
         File fileUpload = File.builder()
                 .fileUrl(url)
@@ -79,9 +109,9 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 .uploadedAt(LocalDateTime.now())
                 .uploadedBy(user)
                 .associatedIDMessageId(associatedIDMessageId)
-                .publicId(publicId)
-                .resourceType(resourceType) // Store the resource type
-                .originalFileName(file.getOriginalFilename()) // Save original file name
+                .publicId(returnedPublicId)
+                .resourceType(resourceType)
+                .originalFileName(originalFilename)
                 .build();
 
         fileRepository.save(fileUpload);
@@ -96,57 +126,92 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
 
-        List<FileResponse> uploadedFiles = files.stream().map(file -> {
-            try {
-                String resourceType = "image"; // default
-                if (file.getContentType() != null) {
-                    String contentType = file.getContentType().toLowerCase();
-                    if (contentType.contains("pdf") || contentType.contains("doc") ||
-                            contentType.contains("xls") || contentType.contains("ppt") ||
-                            contentType.contains("text") || contentType.contains("csv")) {
-                        resourceType = "raw";
-                    } else if (contentType.contains("video")) {
-                        resourceType = "video";
-                    }
-                }
+        List<FileResponse> uploadedFileResponses = new ArrayList<>();
 
-                Map<?, ?> uploadResult = cloudinary.uploader()
-                        .upload(file.getBytes(), ObjectUtils.asMap("resource_type", resourceType));
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) continue;
 
-                String url = uploadResult.get("secure_url").toString();
-                String publicId = uploadResult.get("public_id").toString();
+            // Determine the resource type based on file content type
+            String resourceType = "image"; // default
+            String contentType = file.getContentType() != null ? file.getContentType().toLowerCase() : "";
 
-                File fileUpload = File.builder()
-                        .fileUrl(url)
-                        .fileType(file.getContentType())
-                        .fileSize(file.getSize())
-                        .uploadedAt(LocalDateTime.now())
-                        .uploadedBy(user)
-                        .associatedIDMessageId(associatedIDMessageId)
-                        .publicId(publicId)
-                        .resourceType(resourceType)
-                        .originalFileName(file.getOriginalFilename())
-                        .build();
-
-                fileRepository.save(fileUpload);
-
-                return new FileResponse(
-                        fileUpload.getFileId(),
-                        fileUpload.getFileUrl(),
-                        fileUpload.getFileType(),
-                        fileUpload.getFileSize(),
-                        fileUpload.getPublicId(),
-                        fileUpload.getResourceType(),
-                        fileUpload.getOriginalFileName(),
-                        fileUpload.getAssociatedIDMessageId()
-                );
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
+            if (contentType.contains("pdf") || contentType.contains("doc") ||
+                    contentType.contains("xls") || contentType.contains("ppt") ||
+                    contentType.contains("text") || contentType.contains("csv")) {
+                resourceType = "raw";
+            } else if (contentType.contains("video")) {
+                resourceType = "video";
             }
-        }).toList();
 
-        return new UploadFilesResponse(user, uploadedFiles);
+            // Lấy đuôi file (extension) từ tên gốc
+            String originalFilename = file.getOriginalFilename();
+            String extension = "";
+            String baseFilename = "unknown";
+
+            if (originalFilename != null && originalFilename.contains(".")) {
+                int lastDotIndex = originalFilename.lastIndexOf(".");
+                baseFilename = originalFilename.substring(0, lastDotIndex);
+                extension = originalFilename.substring(lastDotIndex); // giữ cả dấu chấm
+            } else if (originalFilename != null) {
+                baseFilename = originalFilename;
+            }
+
+            // Chuẩn hóa baseFilename (không bao gồm đuôi)
+            String sanitizedBaseFilename = baseFilename.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
+
+            // Tạo public_id có định dạng: sanitizedBaseFilename--UUID + extension
+            String publicId;
+            if ("raw".equals(resourceType)) {
+                publicId = sanitizedBaseFilename + "--" + UUID.randomUUID() + extension;
+            } else {
+                publicId = sanitizedBaseFilename + "--" + UUID.randomUUID(); // Không có đuôi
+            }
+
+            // Upload lên Cloudinary, gắn public_id rõ ràng
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "resource_type", resourceType,
+                            "public_id", publicId
+                    )
+            );
+
+            String url = uploadResult.get("secure_url").toString();
+            String returnedPublicId = uploadResult.get("public_id").toString();
+
+            // Lưu vào DB
+            File fileUpload = File.builder()
+                    .fileUrl(url)
+                    .fileType(file.getContentType())
+                    .fileSize(file.getSize())
+                    .uploadedAt(LocalDateTime.now())
+                    .uploadedBy(user)
+                    .associatedIDMessageId(associatedIDMessageId)
+                    .publicId(returnedPublicId)
+                    .resourceType(resourceType)
+                    .originalFileName(originalFilename)
+                    .build();
+
+            fileRepository.save(fileUpload);
+
+            FileResponse fileResponse = new FileResponse(
+                    fileUpload.getFileId(),
+                    fileUpload.getFileUrl(),
+                    fileUpload.getFileType(),
+                    fileUpload.getFileSize(),
+                    fileUpload.getPublicId(),
+                    fileUpload.getResourceType(),
+                    fileUpload.getOriginalFileName(),
+                    fileUpload.getAssociatedIDMessageId()
+            );
+
+
+            uploadedFileResponses.add(fileResponse);
+        }
+
+        return new UploadFilesResponse(user, uploadedFileResponses);
     }
+
 
     @Override
     public Map<String, Object> downloadFile(String publicId, String savePath) throws IOException {
@@ -177,8 +242,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
             // Lưu file vào thư mục người dùng yêu cầu
             java.io.File saveDir = new java.io.File(savePath);
-            if (!saveDir.exists()) {
-                saveDir.mkdirs();
+            if (!saveDir.exists() && !saveDir.mkdirs()) {
+                throw new IOException("Failed to create directories at: " + savePath);
             }
 
             try (FileOutputStream fos = new FileOutputStream(savePath + java.io.File.separator + originalFileName)) {
@@ -193,14 +258,24 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         );
     }
 
-    //delete file and delete from database
     @Override
     public void deleteFile(String publicId) throws IOException {
-        // Delete the file from Cloudinary
-        cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+        // Lấy thông tin file từ cơ sở dữ liệu
+        File file = fileRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new NotFoundException("File not found"));
 
-        // Find the file in the database and delete it
-        File file = fileRepository.findByPublicId(publicId).orElseThrow(() -> new NotFoundException("File not found"));
+        // Lấy resourceType từ file
+        String resourceType = file.getResourceType();
+
+        // Xóa file trên Cloudinary với resourceType chính xác
+        Map<?, ?> result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", resourceType));
+
+        // Kiểm tra kết quả trả về từ Cloudinary
+        if (!"ok".equals(result.get("result"))) {
+            throw new IOException("Failed to delete file from Cloudinary: " + result.get("result"));
+        }
+
+        // Xóa file khỏi cơ sở dữ liệu
         fileRepository.delete(file);
     }
 

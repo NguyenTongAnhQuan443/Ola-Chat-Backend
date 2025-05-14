@@ -11,10 +11,10 @@ import java.util.Map;
 
 @Service
 public interface CloudinaryService {
-    File uploadFileAndSaveToDB(MultipartFile file, Long associatedIDMessageId) throws IOException;
     //delete file and delete from database
     void deleteFile(String publicId) throws IOException;
     public String uploadImage(MultipartFile file) throws IOException;
     Map<String, Object> downloadFile(String publicId, String savePath) throws IOException;
     UploadFilesResponse uploadFileAndSaveToDB_v2(List<MultipartFile> files, Long associatedIDMessageId) throws IOException;
+    File uploadFileAndSaveToDB_v3(MultipartFile file, Long associatedIDMessageId) throws IOException;
 }
