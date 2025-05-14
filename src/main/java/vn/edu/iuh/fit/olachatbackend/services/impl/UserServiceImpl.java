@@ -255,25 +255,25 @@ public class UserServiceImpl implements UserService {
 
         User targetUser = userOptional.get();
 
-        String action;
-        boolean isFriend;
+        int actionCode;
 
-        if (friendRequestRepository.areFriends(currentUser, targetUser)) {
-            action = "Nhắn tin";
-            isFriend = true;
+        if (targetUser.getId().equals(currentUser.getId())) {
+            actionCode = 0; // NONE
+        } else if (friendRequestRepository.areFriends(currentUser, targetUser)) {
+            actionCode = 4; // UNFRIEND
         } else {
-            Optional<FriendRequest> sentReq = friendRequestRepository.findBySenderAndReceiver(currentUser, targetUser);
-            Optional<FriendRequest> receivedReq = friendRequestRepository.findBySenderAndReceiver(targetUser, currentUser);
+            Optional<FriendRequest> sent = friendRequestRepository.findBySenderAndReceiver(currentUser, targetUser);
+            Optional<FriendRequest> received = friendRequestRepository.findBySenderAndReceiver(targetUser, currentUser);
 
-            if (sentReq.isPresent() && sentReq.get().getStatus() == RequestStatus.PENDING) {
-                action = "Hủy kết bạn";
-            } else if (receivedReq.isPresent() && receivedReq.get().getStatus() == RequestStatus.PENDING) {
-                action = "Đồng ý";
+            if (sent.isPresent() && sent.get().getStatus() == RequestStatus.PENDING) {
+                actionCode = 2; // CANCEL_REQUEST
+            } else if (received.isPresent() && received.get().getStatus() == RequestStatus.PENDING) {
+                actionCode = 3; // ACCEPT_REQUEST
             } else {
-                action = "Kết bạn";
+                actionCode = 1; // SEND_REQUEST
             }
-            isFriend = false;
         }
+
 
         return UserSearchResponse.builder()
                 .userId(String.valueOf(targetUser.getId()))
@@ -283,8 +283,7 @@ public class UserServiceImpl implements UserService {
                 .avatar(targetUser.getAvatar())
                 .bio(targetUser.getBio())
                 .dob(targetUser.getDob())
-                .friendAction(action)
-                .isFriend(isFriend)
+                .friendAction(actionCode)
                 .build();
     }
 
