@@ -5,10 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Component;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
 import vn.edu.iuh.fit.olachatbackend.services.AuthenticationService;
@@ -43,7 +40,7 @@ public class CustomJwtDecoder implements JwtDecoder {
         try {
             if (token == null || token.trim().isEmpty()) {
                 log.warn("❌ Token trống hoặc null");
-                throw new JwtException("Token is missing");
+                throw new BadJwtException("Token is missing");
             }
 
             var response = authenticationService.introspect(
@@ -52,20 +49,20 @@ public class CustomJwtDecoder implements JwtDecoder {
 
             if (!response.isValid()) {
                 log.warn("❌ Token không hợp lệ theo introspect (bị thu hồi hoặc hết hạn)");
-                throw new JwtException("Token invalid (introspection failed)");
+                throw new BadJwtException("Token invalid (introspection failed)");
             }
 
             return nimbusJwtDecoder.decode(token);
 
         } catch (ParseException | JOSEException e) {
             log.error("❌ Lỗi khi phân tích token: {}", e.getMessage());
-            throw new JwtException("Token parsing error", e);
+            throw new BadJwtException("Token parsing error", e);
         } catch (JwtException e) {
             log.warn("❌ Lỗi JWT: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
             log.error("❌ Lỗi không xác định khi decode token: {}", e.getMessage());
-            throw new JwtException("Unexpected error during token decoding", e);
+            throw new BadJwtException("Unexpected error during token decoding", e);
         }
     }
 }

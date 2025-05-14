@@ -29,6 +29,12 @@ public class UserSearchResponse {
     private String avatar;
     private String bio;
     private LocalDateTime dob;
-    private String friendAction; // "Kết bạn", "Hủy kết bạn", "Đồng ý", "Nhắn tin"
+    private int friendAction;
+//            0: null,
+//            1: "Kết bạn",
+//            2: "Hủy lời mời",
+//            3: "Chấp nhận / Từ chối",
+//            4: "Bạn bè",
+//            5: "Nhắn tin"
 }
 

@@ -90,13 +90,24 @@ public class UserServiceImpl implements UserService {
 
     public UserResponse registerUser(UserRegisterRequest request){
         String username = request.getUsername();
+        String email = request.getEmail();
+
+        // Kiểm tra username đã tồn tại
         if (userRepository.existsByUsername(username)) {
-            throw new InternalServerErrorException("Tên đăng nhập đã tồn tại");
+            throw new BadRequestException("Số điện thoại đăng ký đã tồn tại");
         }
+
+        // Kiểm tra email đã tồn tại
+        if (userRepository.existsByEmail(email)) {
+            throw new BadRequestException("Email đã được sử dụng");
+        }
+
         User user = userMapper.toUser(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+
         return userMapper.toUserResponse(userRepository.save(user));
     }
+
 
 
     public UserResponse getMyInfo() {
@@ -255,22 +266,25 @@ public class UserServiceImpl implements UserService {
 
         User targetUser = userOptional.get();
 
-        String action;
+        int actionCode;
 
-        if (friendRequestRepository.areFriends(currentUser, targetUser)) {
-            action = "Nhắn tin";
+        if (targetUser.getId().equals(currentUser.getId())) {
+            actionCode = 0; // NONE
+        } else if (friendRequestRepository.areFriends(currentUser, targetUser)) {
+            actionCode = 4; // UNFRIEND
         } else {
-            Optional<FriendRequest> sentReq = friendRequestRepository.findBySenderAndReceiver(currentUser, targetUser);
-            Optional<FriendRequest> receivedReq = friendRequestRepository.findBySenderAndReceiver(targetUser, currentUser);
+            Optional<FriendRequest> sent = friendRequestRepository.findBySenderAndReceiver(currentUser, targetUser);
+            Optional<FriendRequest> received = friendRequestRepository.findBySenderAndReceiver(targetUser, currentUser);
 
-            if (sentReq.isPresent() && sentReq.get().getStatus() == RequestStatus.PENDING) {
-                action = "Hủy kết bạn";
-            } else if (receivedReq.isPresent() && receivedReq.get().getStatus() == RequestStatus.PENDING) {
-                action = "Đồng ý";
+            if (sent.isPresent() && sent.get().getStatus() == RequestStatus.PENDING) {
+                actionCode = 2; // CANCEL_REQUEST
+            } else if (received.isPresent() && received.get().getStatus() == RequestStatus.PENDING) {
+                actionCode = 3; // ACCEPT_REQUEST
             } else {
-                action = "Kết bạn";
+                actionCode = 1; // SEND_REQUEST
             }
         }
+
 
         return UserSearchResponse.builder()
                 .userId(String.valueOf(targetUser.getId()))
@@ -280,7 +294,7 @@ public class UserServiceImpl implements UserService {
                 .avatar(targetUser.getAvatar())
                 .bio(targetUser.getBio())
                 .dob(targetUser.getDob())
-                .friendAction(action)
+                .friendAction(actionCode)
                 .build();
     }
 
