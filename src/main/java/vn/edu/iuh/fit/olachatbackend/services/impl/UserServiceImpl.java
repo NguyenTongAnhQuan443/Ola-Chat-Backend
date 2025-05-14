@@ -90,13 +90,24 @@ public class UserServiceImpl implements UserService {
 
     public UserResponse registerUser(UserRegisterRequest request){
         String username = request.getUsername();
+        String email = request.getEmail();
+
+        // Kiểm tra username đã tồn tại
         if (userRepository.existsByUsername(username)) {
-            throw new InternalServerErrorException("Tên đăng nhập đã tồn tại");
+            throw new BadRequestException("Số điện thoại đăng ký đã tồn tại");
         }
+
+        // Kiểm tra email đã tồn tại
+        if (userRepository.existsByEmail(email)) {
+            throw new BadRequestException("Email đã được sử dụng");
+        }
+
         User user = userMapper.toUser(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+
         return userMapper.toUserResponse(userRepository.save(user));
     }
+
 
 
     public UserResponse getMyInfo() {
