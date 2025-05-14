@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
@@ -28,7 +29,7 @@ public class PostController {
     }
 
     @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<Post> createPost(
+    public ResponseEntity<MessageResponse<Post>> createPost(
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "privacy") String privacy,
             @RequestParam(value = "files", required = false) List<MultipartFile> files) throws IOException {
@@ -42,109 +43,181 @@ public class PostController {
         }
 
         Post createdPost = postService.createPost(content, privacy, mediaList);
-        return ResponseEntity.ok(createdPost);
+        MessageResponse<Post> response = MessageResponse.<Post>builder()
+                .message("Post created successfully")
+                .data(createdPost)
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{postId}")
-    public ResponseEntity<PostResponse> getPostById(@PathVariable Long postId) {
+    public ResponseEntity<MessageResponse<PostResponse>> getPostById(@PathVariable Long postId) {
         PostResponse postResponse = postService.getPostById(postId);
-        return ResponseEntity.ok(postResponse);
+        MessageResponse<PostResponse> response = MessageResponse.<PostResponse>builder()
+                .message("Post retrieved successfully")
+                .data(postResponse)
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<PostResponse>> getUserPosts() {
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserPosts() {
         List<PostResponse> postResponses = postService.getUserPosts();
-        return ResponseEntity.ok(postResponses);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("User posts retrieved successfully")
+                        .data(postResponses)
+                        .build()
+        );
     }
 
     @DeleteMapping("/{postId}")
-    public ResponseEntity<List<PostResponse>> deletePostAndReturnRemaining(@PathVariable Long postId) throws IOException {
+    public ResponseEntity<MessageResponse<List<PostResponse>>> deletePostAndReturnRemaining(@PathVariable Long postId) throws IOException {
         List<PostResponse> postResponses = postService.deletePostByIdAndReturnRemaining(postId);
-        return ResponseEntity.ok(postResponses);
+        MessageResponse<List<PostResponse>> response = MessageResponse.<List<PostResponse>>builder()
+                .message("Post deleted successfully")
+                .data(postResponses)
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping(value = "/{postId}", consumes = "multipart/form-data")
-    public ResponseEntity<PostResponse> updatePost(
+    public ResponseEntity<MessageResponse<PostResponse>> updatePost(
             @PathVariable Long postId,
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "filesToDelete", required = false) List<String> filesToDelete,
             @RequestParam(value = "newFiles", required = false) List<MultipartFile> newFiles) throws IOException {
 
         PostResponse postResponse = postService.updatePost(postId, content, filesToDelete, newFiles);
-        return ResponseEntity.ok(postResponse);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post updated successfully")
+                        .data(postResponse)
+                        .build()
+        );
     }
 
     @PostMapping("/{postId}/like")
-    public ResponseEntity<PostResponse> likePost(@PathVariable Long postId) {
+    public ResponseEntity<MessageResponse<PostResponse>> likePost(@PathVariable Long postId) {
         PostResponse postResponse = postService.likePost(postId);
-        return ResponseEntity.ok(postResponse);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post liked successfully")
+                        .data(postResponse)
+                        .build()
+        );
     }
 
     @DeleteMapping("/{postId}/like")
-    public ResponseEntity<PostResponse> toggleLikePost(@PathVariable Long postId) {
+    public ResponseEntity<MessageResponse<PostResponse>> toggleLikePost(@PathVariable Long postId) {
         PostResponse postResponse = postService.toggleLikePost(postId);
-        return ResponseEntity.ok(postResponse);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post unliked successfully")
+                        .data(postResponse)
+                        .build()
+        );
     }
 
     @PostMapping("/{postId}/comments")
-    public ResponseEntity<PostResponse> addCommentToPost(
+    public ResponseEntity<MessageResponse<PostResponse>> addCommentToPost(
             @PathVariable Long postId,
             @RequestParam("content") String content) {
         PostResponse postResponse = postService.addCommentToPost(postId, content);
-        return ResponseEntity.ok(postResponse);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Comment added to post successfully")
+                        .data(postResponse)
+                        .build()
+        );
     }
 
     //Lấy danh sách bình luận theo cấu trúc phân cấp
     @GetMapping("/{postId}/comments/hierarchy")
-    public ResponseEntity<List<CommentHierarchyResponse>> getCommentHierarchy(@PathVariable Long postId) {
+    public ResponseEntity<MessageResponse<List<CommentHierarchyResponse>>> getCommentHierarchy(@PathVariable Long postId) {
         List<CommentHierarchyResponse> commentHierarchy = postService.getCommentHierarchy(postId);
-        return ResponseEntity.ok(commentHierarchy);
+        return ResponseEntity.ok(
+                MessageResponse.<List<CommentHierarchyResponse>>builder()
+                        .message("Comment hierarchy retrieved successfully")
+                        .data(commentHierarchy)
+                        .build()
+        );
     }
 
     @DeleteMapping("/comments/{commentId}")
-    public ResponseEntity<List<CommentHierarchyResponse>> deleteComment(@PathVariable Long commentId) {
+    public ResponseEntity<MessageResponse<List<CommentHierarchyResponse>>> deleteComment(@PathVariable Long commentId) {
         List<CommentHierarchyResponse> updatedComments = postService.deleteComment(commentId);
-        return ResponseEntity.ok(updatedComments);
+        return ResponseEntity.ok(
+                MessageResponse.<List<CommentHierarchyResponse>>builder()
+                        .message("Comment deleted successfully")
+                        .data(updatedComments)
+                        .build()
+        );
     }
 
     @PostMapping("/comments/{commentId}/replies")
-    public ResponseEntity<List<CommentHierarchyResponse>> addReplyToComment(
+    public ResponseEntity<MessageResponse<List<CommentHierarchyResponse>>> addReplyToComment(
             @PathVariable Long commentId,
             @RequestParam("content") String content) {
         List<CommentHierarchyResponse> commentHierarchy = postService.addReplyToComment(commentId, content);
-        return ResponseEntity.ok(commentHierarchy);
+        return ResponseEntity.ok(
+                MessageResponse.<List<CommentHierarchyResponse>>builder()
+                        .message("Reply added to comment successfully")
+                        .data(commentHierarchy)
+                        .build()
+        );
     }
 
     @PutMapping("/comments/{commentId}")
-    public ResponseEntity<CommentHierarchyResponse> updateComment(
+    public ResponseEntity<MessageResponse<CommentHierarchyResponse>> updateComment(
             @PathVariable Long commentId,
             @RequestParam("content") String content) {
         CommentHierarchyResponse updatedComment = postService.updateComment(commentId, content);
-        return ResponseEntity.ok(updatedComment);
+        return ResponseEntity.ok(
+                MessageResponse.<CommentHierarchyResponse>builder()
+                        .message("Comment updated successfully")
+                        .data(updatedComment)
+                        .build()
+        );
     }
 
     @PostMapping("/{postId}/share")
-    public ResponseEntity<PostResponse> sharePost(
+    public ResponseEntity<MessageResponse<PostResponse>> sharePost(
             @PathVariable Long postId,
             @RequestParam(value = "content", required = false) String content) {
         PostResponse postResponse = postService.sharePost(postId, content);
-        return ResponseEntity.ok(postResponse);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post shared successfully")
+                        .data(postResponse)
+                        .build()
+        );
     }
 
     @GetMapping("/feed")
-    public ResponseEntity<List<PostResponse>> getFeed(
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getFeed(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         List<PostResponse> feed = postService.getFeed(page, size);
-        return ResponseEntity.ok(feed);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("Feed retrieved successfully")
+                        .data(feed)
+                        .build()
+        );
     }
 
     @GetMapping("/user/{userId}/posts")
-    public ResponseEntity<List<PostResponse>> getUserProfilePosts(
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserProfilePosts(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         List<PostResponse> posts = postService.getUserProfilePosts(userId, page, size);
-        return ResponseEntity.ok(posts);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("User profile posts retrieved successfully")
+                        .data(posts)
+                        .build()
+        );
     }
 }
