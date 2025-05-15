@@ -22,7 +22,7 @@ public interface PostService {
     List<CommentHierarchyResponse> deleteComment(Long commentId);
     List<CommentHierarchyResponse> addReplyToComment(Long commentId, String content);
     CommentHierarchyResponse updateComment(Long commentId, String content);
-    PostResponse sharePost(Long postId, String content);
+    PostResponse sharePost(Long postId, String content, String privacy);
     List<ShareResponse> getPostShares(Long postId);
     List<PostResponse> getFeed(int page, int size);
     UserPostsResponse getUserProfilePosts(String userId, int page, int size);

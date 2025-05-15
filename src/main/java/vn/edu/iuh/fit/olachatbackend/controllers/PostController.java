@@ -101,8 +101,9 @@ public class PostController {
     @PostMapping("/{postId}/share")
     public ResponseEntity<MessageResponse<PostResponse>> sharePost(
             @PathVariable Long postId,
-            @RequestParam(value = "content", required = false) String content) {
-        PostResponse postResponse = postService.sharePost(postId, content);
+            @RequestParam(value = "content", required = false) String content,
+            @RequestParam(value = "privacy", required = false, defaultValue = "PUBLIC") String privacy) {
+        PostResponse postResponse = postService.sharePost(postId, content, privacy);
         return ResponseEntity.ok(
                 MessageResponse.<PostResponse>builder()
                         .message("Post shared successfully")

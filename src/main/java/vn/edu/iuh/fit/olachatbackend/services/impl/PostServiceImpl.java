@@ -290,39 +290,39 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public PostResponse sharePost(Long postId, String content) {
-        // Lấy bài viết cần chia sẻ
+    public PostResponse sharePost(Long postId, String content, String privacy) {
+        // Retrieve the post to share
         Post postToShare = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Lấy người dùng hiện tại
+        // Retrieve the current user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Xác định bài gốc thực sự (nếu là bài share thì lấy bài gốc của bài đó)
+        // Determine the original post
         Post originalPost = postToShare.getOriginalPost() != null ? postToShare.getOriginalPost() : postToShare;
 
-        // Kiểm tra quyền chia sẻ
+        // Check sharing permissions
         if (!canSharePost(originalPost, currentUser)) {
             throw new BadRequestException("You do not have permission to share this post.");
         }
 
-        // Tạo bài share mới
+        // Create a new shared post
         Post sharedPost = Post.builder()
                 .content(content)
-                .attachments(null) // Không đính kèm file trong bài share
-                .privacy(Privacy.PUBLIC) // Bài share mặc định là công khai
+                .attachments(null) // No attachments for shared posts
+                .privacy(Privacy.valueOf(privacy.toUpperCase())) // Use provided privacy or default to PUBLIC
                 .createdBy(currentUser)
                 .createdAt(LocalDateTime.now())
                 .originalPost(originalPost)
                 .originalPostId(originalPost.getPostId())
                 .build();
 
-        // Lưu bài share
+        // Save the shared post
         Post savedPost = postRepository.save(sharedPost);
 
-        // Lưu thông tin vào bảng share (với bài gốc thực sự)
+        // Save the share record
         Share share = Share.builder()
                 .post(originalPost)
                 .sharedPost(savedPost)
