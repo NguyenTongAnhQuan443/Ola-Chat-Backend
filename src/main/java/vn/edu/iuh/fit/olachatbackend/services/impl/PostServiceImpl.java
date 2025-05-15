@@ -693,4 +693,56 @@ public class PostServiceImpl implements PostService {
                 posts.getSize()
         );
     }
+
+    @Override
+    public List<PostResponse> searchPosts(String keyword, int page, int size) {
+        // Lấy tên người dùng hiện tại từ SecurityContext
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Tạo đối tượng phân trang
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // Tìm các bài viết có nội dung chứa từ khóa (không phân biệt hoa thường)
+        Page<Post> posts = postRepository.findByContentContainingIgnoreCase(keyword, pageable);
+
+        // Lọc bài viết dựa trên quyền riêng tư và mối quan hệ bạn bè
+        return posts.stream()
+                .filter(post -> {
+                    if (post.getCreatedBy().equals(currentUser)) {
+                        return true; // Hiển thị tất cả bài viết của chính người dùng
+                    } else if (isFriend(post.getCreatedBy(), currentUser)) {
+                        // Hiển thị bài viết công khai hoặc chỉ bạn bè
+                        return post.getPrivacy() == Privacy.PUBLIC || post.getPrivacy() == Privacy.FRIENDS;
+                    } else {
+                        // Chỉ hiển thị bài viết công khai
+                        return post.getPrivacy() == Privacy.PUBLIC;
+                    }
+                })
+                .map(post -> {
+                    // Kiểm tra quyền xem bài gốc nếu bài viết là bài chia sẻ
+                    Post originalPost = post.getOriginalPost();
+                    if (originalPost != null) {
+                        boolean canViewOriginal = true;
+
+                        if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                                !originalPost.getCreatedBy().equals(currentUser)) {
+                            canViewOriginal = false;
+                        } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                                !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                                !originalPost.getCreatedBy().equals(currentUser)) {
+                            canViewOriginal = false;
+                        }
+
+                        if (!canViewOriginal) {
+                            post.setOriginalPost(null); // Ẩn bài gốc nếu không có quyền xem
+                        }
+                    }
+
+                    // Chuyển đổi bài viết sang PostResponse
+                    return postMapper.toPostResponse(post);
+                })
+                .toList();
+    }
 }

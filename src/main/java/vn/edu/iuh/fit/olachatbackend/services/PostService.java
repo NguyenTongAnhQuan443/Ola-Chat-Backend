@@ -29,4 +29,5 @@ public interface PostService {
     List<PostResponse> getFeed(int page, int size);
     UserPostsResponse getUserProfilePosts(String userId, int page, int size);
     List<PostUserResponse> getPostLikes(Long postId);
+    List<PostResponse> searchPosts(String keyword, int page, int size);
 }

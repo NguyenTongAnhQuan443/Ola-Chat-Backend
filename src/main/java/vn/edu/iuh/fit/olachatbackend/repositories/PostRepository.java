@@ -23,4 +23,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByCreatedByAndPrivacyIn(User user, List<Privacy> privacies, Pageable pageable);
 
     List<Post> findByOriginalPost(Post originalPost);
+
+    Page<Post> findByContentContainingIgnoreCase(String keyword, Pageable pageable);
 }

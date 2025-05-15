@@ -233,4 +233,18 @@ public class PostController {
                         .build()
         );
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<MessageResponse<List<PostResponse>>> searchPosts(
+            @RequestParam("keyword") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<PostResponse> posts = postService.searchPosts(keyword, page, size);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("Posts retrieved successfully")
+                        .data(posts)
+                        .build()
+        );
+    }
 }
