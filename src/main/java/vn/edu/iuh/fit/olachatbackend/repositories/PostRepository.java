@@ -12,7 +12,6 @@ import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
-    List<Post> findByCreatedBy(User user);
 
     @Query("SELECT p FROM Post p WHERE p.createdBy.id = :userId OR p.createdBy.id IN :friendIds ORDER BY p.createdAt DESC")
     List<Post> findFeedPosts(@Param("userId") String userId, @Param("friendIds") List<String> friendIds, Pageable pageable);
@@ -22,4 +21,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByCreatedByAndPrivacy(User user, Privacy privacy, Pageable pageable);
 
     Page<Post> findByCreatedByAndPrivacyIn(User user, List<Privacy> privacies, Pageable pageable);
+
+    List<Post> findByOriginalPost(Post originalPost);
 }

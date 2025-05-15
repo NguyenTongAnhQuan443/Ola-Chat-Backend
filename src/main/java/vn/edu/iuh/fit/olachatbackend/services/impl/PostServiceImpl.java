@@ -14,7 +14,6 @@ import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
-import vn.edu.iuh.fit.olachatbackend.mappers.MediaMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.CommentService;
@@ -175,7 +174,6 @@ public class PostServiceImpl implements PostService {
         );
     }
 
-    @Override
     @Transactional
     public void deletePostById(Long postId) throws IOException {
         Post post = postRepository.findById(postId)
@@ -189,30 +187,25 @@ public class PostServiceImpl implements PostService {
             throw new BadRequestException("You do not have permission to delete this post");
         }
 
-        // Nếu originalPost là transient thì throw lỗi hoặc bỏ qua (vì xóa post mà phải lưu một post khác là không hợp lý)
-        if (post.getOriginalPost() != null && post.getOriginalPost().getPostId() == null) {
-            throw new IllegalStateException("Original post is transient (unsaved). Cannot delete post referencing unsaved original post.");
+        // Ngắt liên kết các bài share đã tham chiếu bài này
+        List<Post> sharedPosts = postRepository.findByOriginalPost(post);
+        for (Post sharedPost : sharedPosts) {
+            sharedPost.setOriginalPost(null);
+            postRepository.save(sharedPost);
         }
 
-        // Xóa tất cả các share liên quan đến post này (post được share)
+        // Xóa các bản ghi share, like, comment liên quan (nếu có)
         shareRepository.deleteBySharedPost(post);
-
-        // Xóa tất cả các share có post là post này (post được share đi)
-        List<Share> sharesToDelete = shareRepository.findAll().stream()
-                .filter(share -> share.getPost().equals(post))
-                .toList();
+        List<Share> sharesToDelete = shareRepository.findByPost(post);
         shareRepository.deleteAll(sharesToDelete);
 
-        // Xóa attachments nếu có
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
             mediaService.deleteMediaFromCloudinary(post.getAttachments());
         }
 
-        // Xóa likes và comments liên quan đến post
         likeRepository.deleteAllByPost(post);
         commentRepository.deleteAllByPost(post);
 
-        // Cuối cùng xóa post
         postRepository.delete(post);
     }
 

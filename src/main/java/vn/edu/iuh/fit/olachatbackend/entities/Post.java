@@ -52,7 +52,7 @@ public class Post {
     @Column(name = "post_id_original")
     private Long originalPostId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "original_post_id")
     private Post originalPost;
 }
