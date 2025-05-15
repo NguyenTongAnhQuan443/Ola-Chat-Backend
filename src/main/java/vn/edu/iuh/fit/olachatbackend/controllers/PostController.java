@@ -213,13 +213,13 @@ public class PostController {
     }
 
     @GetMapping("/user/{userId}/posts")
-    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserProfilePosts(
+    public ResponseEntity<MessageResponse<UserPostsResponse>> getUserProfilePosts(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        List<PostResponse> posts = postService.getUserProfilePosts(userId, page, size);
+        UserPostsResponse posts = postService.getUserProfilePosts(userId, page, size);
         return ResponseEntity.ok(
-                MessageResponse.<List<PostResponse>>builder()
+                MessageResponse.<UserPostsResponse>builder()
                         .message("User profile posts retrieved successfully")
                         .data(posts)
                         .build()

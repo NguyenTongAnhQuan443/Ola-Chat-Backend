@@ -604,7 +604,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public List<PostResponse> getUserProfilePosts(String userId, int page, int size) {
+    public UserPostsResponse getUserProfilePosts(String userId, int page, int size) {
         // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
@@ -623,19 +623,53 @@ public class PostServiceImpl implements PostService {
         Page<Post> posts;
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         if (currentUser.equals(profileUser)) {
-            // Chính chủ: Hiển thị tất cả bài đăng
             posts = postRepository.findByCreatedBy(profileUser, pageRequest);
         } else if (isFriend) {
-            // Bạn bè: Hiển thị bài đăng PUBLIC và FRIENDS
             posts = postRepository.findByCreatedByAndPrivacyIn(profileUser, List.of(Privacy.PUBLIC, Privacy.FRIENDS), pageRequest);
         } else {
-            // Không phải bạn bè: Chỉ hiển thị bài đăng PUBLIC
             posts = postRepository.findByCreatedByAndPrivacy(profileUser, Privacy.PUBLIC, pageRequest);
         }
 
-        // Map sang PostResponse
-        return posts.stream()
-                .map(postMapper::toPostResponse)
-                .toList();
+        // Map danh sách bài đăng sang UserPostOnlyResponse
+        List<UserPostOnlyResponse> postResponses = posts.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+            Long originalPostId = null;
+
+            if (originalPost != null) {
+                originalPostId = originalPost.getPostId();
+
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null); // Ẩn chi tiết bài gốc
+                }
+            }
+
+            UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
+            postResponse.setOriginalPostId(originalPostId);
+
+            return postResponse;
+        }).toList();
+
+        // Tạo thông tin người dùng
+        PostUserResponse createdBy = postMapper.userToPostUserResponse(profileUser);
+
+        // Trả về UserPostsResponse
+        return new UserPostsResponse(
+                createdBy,
+                postResponses,
+                posts.getTotalPages(),
+                posts.getNumber() + 1,
+                posts.getSize()
+        );
     }
 }
