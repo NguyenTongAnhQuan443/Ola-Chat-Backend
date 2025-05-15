@@ -570,7 +570,6 @@ public class PostServiceImpl implements PostService {
                 .build();
     }
 
-    @Override
     public List<PostResponse> getFeed(int page, int size) {
         // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -598,9 +597,34 @@ public class PostServiceImpl implements PostService {
                 .toList();
 
         // Map sang PostResponse
-        return posts.stream()
-                .map(postMapper::toPostResponse)
-                .toList();
+        return posts.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+            Long originalPostId = null;
+
+            if (originalPost != null) {
+                originalPostId = originalPost.getPostId();
+
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null); // Ẩn chi tiết bài gốc
+                }
+            }
+
+            PostResponse postResponse = postMapper.toPostResponse(post);
+            postResponse.setOriginalPostId(originalPostId);
+
+            return postResponse;
+        }).toList();
     }
 
     @Override
