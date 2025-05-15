@@ -393,6 +393,30 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    public List<PostUserResponse> getPostLikes(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền truy cập bài đăng
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to view likes for this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to view likes for this post");
+        }
+
+        // Lấy danh sách người thích bài đăng
+        return likeRepository.findAllByPost(post).stream()
+                .map(like -> postMapper.userToPostUserResponse(like.getLikedBy()))
+                .toList();
+    }
+
+    @Override
     public boolean toggleLikePost(Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));

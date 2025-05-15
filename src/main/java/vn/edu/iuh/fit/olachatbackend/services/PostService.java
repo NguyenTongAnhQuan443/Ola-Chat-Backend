@@ -4,6 +4,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostUserResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserPostsResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 import vn.edu.iuh.fit.olachatbackend.entities.Post;
@@ -27,4 +28,5 @@ public interface PostService {
     PostResponse sharePost(Long postId, String content);
     List<PostResponse> getFeed(int page, int size);
     UserPostsResponse getUserProfilePosts(String userId, int page, int size);
+    List<PostUserResponse> getPostLikes(Long postId);
 }

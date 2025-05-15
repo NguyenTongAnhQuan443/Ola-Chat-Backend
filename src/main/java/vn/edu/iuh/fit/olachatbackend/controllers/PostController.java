@@ -4,10 +4,7 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserPostsResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
 
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
@@ -116,7 +113,7 @@ public class PostController {
 
     @PostMapping("/{postId}/like")
     public ResponseEntity<MessageResponse<String>> likePost(@PathVariable Long postId) {
-        postService.likePost(postId); // Không cần nhận lại PostResponse
+        postService.likePost(postId);
         return ResponseEntity.ok(
                 MessageResponse.<String>builder()
                         .message("Post liked successfully")
@@ -133,6 +130,17 @@ public class PostController {
         return ResponseEntity.ok(
                 MessageResponse.builder()
                         .message(message)
+                        .build()
+        );
+    }
+
+    @GetMapping("/{postId}/likes")
+    public ResponseEntity<MessageResponse<List<PostUserResponse>>> getPostLikes(@PathVariable Long postId) {
+        List<PostUserResponse> likes = postService.getPostLikes(postId);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostUserResponse>>builder()
+                        .message("Likes retrieved successfully")
+                        .data(likes)
                         .build()
         );
     }
