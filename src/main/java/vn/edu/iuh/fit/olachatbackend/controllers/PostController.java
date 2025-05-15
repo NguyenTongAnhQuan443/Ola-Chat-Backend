@@ -146,14 +146,14 @@ public class PostController {
     }
 
     @PostMapping("/{postId}/comments")
-    public ResponseEntity<MessageResponse<PostResponse>> addCommentToPost(
+    public ResponseEntity<MessageResponse<List<CommentHierarchyResponse>>> addCommentToPost(
             @PathVariable Long postId,
             @RequestParam("content") String content) {
-        PostResponse postResponse = postService.addCommentToPost(postId, content);
+        List<CommentHierarchyResponse> commentHierarchy = postService.addCommentToPost(postId, content);
         return ResponseEntity.ok(
-                MessageResponse.<PostResponse>builder()
+                MessageResponse.<List<CommentHierarchyResponse>>builder()
                         .message("Comment added to post successfully")
-                        .data(postResponse)
+                        .data(commentHierarchy)
                         .build()
         );
     }

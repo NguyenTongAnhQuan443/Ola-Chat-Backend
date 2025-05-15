@@ -20,7 +20,7 @@ public interface PostService {
     PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     void likePost(Long postId);
     boolean toggleLikePost(Long postId);
-    PostResponse addCommentToPost(Long postId, String content);
+    List<CommentHierarchyResponse> addCommentToPost(Long postId, String content);
     List<CommentHierarchyResponse> getCommentHierarchy(Long postId);
     List<CommentHierarchyResponse> deleteComment(Long commentId);
     List<CommentHierarchyResponse> addReplyToComment(Long commentId, String content);

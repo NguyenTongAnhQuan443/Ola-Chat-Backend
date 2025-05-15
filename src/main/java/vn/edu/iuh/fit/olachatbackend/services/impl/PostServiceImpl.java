@@ -39,8 +39,6 @@ public class PostServiceImpl implements PostService {
     private final ShareRepository shareRepository;
 
     @Autowired
-    private MediaMapper mediaMapper;
-    @Autowired
     private PostMapper postMapper;
 
     public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
@@ -101,11 +99,8 @@ public class PostServiceImpl implements PostService {
         }
 
         Post originalPost = post.getOriginalPost();
-        Long originalPostId = null;
 
         if (originalPost != null) {
-            originalPostId = originalPost.getPostId(); // lưu lại ID
-
             boolean canViewOriginal = true;
 
             if (originalPost.getPrivacy() == Privacy.PRIVATE &&
@@ -118,7 +113,7 @@ public class PostServiceImpl implements PostService {
             }
 
             if (!canViewOriginal) {
-                post.setOriginalPost(null); // chặn xem chi tiết
+                post.setOriginalPost(null);
             }
         }
 
@@ -127,9 +122,6 @@ public class PostServiceImpl implements PostService {
 
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
-
-        // Gán originalPostId dù originalPost đã bị null
-        postResponse.setOriginalPostId(originalPostId);
 
         return postResponse;
     }
@@ -145,11 +137,8 @@ public class PostServiceImpl implements PostService {
 
         List<UserPostOnlyResponse> postResponses = postPage.stream().map(post -> {
             Post originalPost = post.getOriginalPost();
-            Long originalPostId = null;
 
             if (originalPost != null) {
-                originalPostId = originalPost.getPostId();
-
                 boolean canViewOriginal = true;
 
                 if (originalPost.getPrivacy() == Privacy.PRIVATE &&
@@ -162,7 +151,7 @@ public class PostServiceImpl implements PostService {
                 }
 
                 if (!canViewOriginal) {
-                    post.setOriginalPost(null); // Xoá chi tiết bài gốc
+                    post.setOriginalPost(null);
                 }
             }
 
@@ -171,9 +160,6 @@ public class PostServiceImpl implements PostService {
 
             UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
             postResponse.setComments(commentHierarchy);
-
-            // Gán originalPostId dù originalPost bị ẩn
-            postResponse.setOriginalPostId(originalPostId);
 
             return postResponse;
         }).collect(Collectors.toList());
@@ -203,16 +189,30 @@ public class PostServiceImpl implements PostService {
             throw new BadRequestException("You do not have permission to delete this post");
         }
 
-        if (post.getOriginalPost() != null) {
-            shareRepository.deleteBySharedPost(post);
+        // Nếu originalPost là transient thì throw lỗi hoặc bỏ qua (vì xóa post mà phải lưu một post khác là không hợp lý)
+        if (post.getOriginalPost() != null && post.getOriginalPost().getPostId() == null) {
+            throw new IllegalStateException("Original post is transient (unsaved). Cannot delete post referencing unsaved original post.");
         }
 
+        // Xóa tất cả các share liên quan đến post này (post được share)
+        shareRepository.deleteBySharedPost(post);
+
+        // Xóa tất cả các share có post là post này (post được share đi)
+        List<Share> sharesToDelete = shareRepository.findAll().stream()
+                .filter(share -> share.getPost().equals(post))
+                .toList();
+        shareRepository.deleteAll(sharesToDelete);
+
+        // Xóa attachments nếu có
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
             mediaService.deleteMediaFromCloudinary(post.getAttachments());
         }
 
+        // Xóa likes và comments liên quan đến post
         likeRepository.deleteAllByPost(post);
         commentRepository.deleteAllByPost(post);
+
+        // Cuối cùng xóa post
         postRepository.delete(post);
     }
 
@@ -230,7 +230,6 @@ public class PostServiceImpl implements PostService {
         }
 
         Post originalPost = post.getOriginalPost();
-        Long originalPostId = null;
         boolean hideOriginalPost = false;
 
         if (originalPost != null) {
@@ -240,9 +239,6 @@ public class PostServiceImpl implements PostService {
             } else {
                 throw new BadRequestException("Shared posts can only update content.");
             }
-
-            // Lưu lại originalPostId để phản hồi
-            originalPostId = originalPost.getPostId();
 
             // Kiểm tra quyền xem bài gốc
             if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
@@ -288,11 +284,6 @@ public class PostServiceImpl implements PostService {
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
 
-        // Gán lại originalPostId (ngay cả khi originalPost bị ẩn)
-        if (originalPostId != null) {
-            postResponse.setOriginalPostId(originalPostId);
-        }
-
         // Nếu không có quyền xem bài gốc, thì ẩn nội dung bài gốc trong phản hồi
         if (hideOriginalPost) {
             postResponse.setOriginalPost(null);
@@ -328,6 +319,7 @@ public class PostServiceImpl implements PostService {
                 .createdBy(currentUser)
                 .createdAt(LocalDateTime.now())
                 .originalPost(originalPost)
+                .originalPostId(originalPost.getPostId())
                 .build();
 
         // Lưu bài share
@@ -451,7 +443,7 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public PostResponse addCommentToPost(Long postId, String content) {
+    public List<CommentHierarchyResponse> addCommentToPost(Long postId, String content) {
         // Lấy bài đăng từ DB
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
@@ -483,13 +475,7 @@ public class PostServiceImpl implements PostService {
         List<Comment> allComments = commentService.findAllByPost(post);
 
         // Xây dựng cấu trúc phân cấp cho bình luận
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-        // Map bài đăng sang PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
+        return commentService.buildCommentHierarchy(allComments);
     }
 
     @Override
@@ -623,10 +609,8 @@ public class PostServiceImpl implements PostService {
         // Map sang PostResponse
         return posts.stream().map(post -> {
             Post originalPost = post.getOriginalPost();
-            Long originalPostId = null;
 
             if (originalPost != null) {
-                originalPostId = originalPost.getPostId();
 
                 boolean canViewOriginal = true;
 
@@ -640,12 +624,11 @@ public class PostServiceImpl implements PostService {
                 }
 
                 if (!canViewOriginal) {
-                    post.setOriginalPost(null); // Ẩn chi tiết bài gốc
+                    post.setOriginalPost(null);
                 }
             }
 
             PostResponse postResponse = postMapper.toPostResponse(post);
-            postResponse.setOriginalPostId(originalPostId);
 
             return postResponse;
         }).toList();
@@ -681,10 +664,8 @@ public class PostServiceImpl implements PostService {
         // Map danh sách bài đăng sang UserPostOnlyResponse
         List<UserPostOnlyResponse> postResponses = posts.stream().map(post -> {
             Post originalPost = post.getOriginalPost();
-            Long originalPostId = null;
 
             if (originalPost != null) {
-                originalPostId = originalPost.getPostId();
 
                 boolean canViewOriginal = true;
 
@@ -703,7 +684,6 @@ public class PostServiceImpl implements PostService {
             }
 
             UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
-            postResponse.setOriginalPostId(originalPostId);
 
             return postResponse;
         }).toList();

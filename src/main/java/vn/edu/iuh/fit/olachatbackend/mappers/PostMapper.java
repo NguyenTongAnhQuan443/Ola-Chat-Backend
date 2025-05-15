@@ -15,7 +15,7 @@ public interface PostMapper {
 
     @Mapping(target = "likedUsers", expression = "java(mapLikedUsers(post.getLikes()))")
     @Mapping(target = "comments", expression = "java(commentListToCommentHierarchyResponseList(post.getComments()))")
-    @Mapping(target = "originalPostId", source = "originalPost.postId")
+    @Mapping(target = "originalPostId", source = "originalPostId")
     @Mapping(target = "originalPost", expression = "java(post.getOriginalPost() != null ? toPostResponse(post.getOriginalPost()) : null)")
     @Mapping(target = "attachments", expression = "java(mediaListToMediaPostResponseList(post.getAttachments()))")
     @Mapping(target = "createdBy", expression = "java(userToPostUserResponse(post.getCreatedBy()))")
@@ -53,7 +53,7 @@ public interface PostMapper {
 
     @Mapping(target = "attachments", expression = "java(mediaListToMediaPostResponseList(post.getAttachments()))")
     @Mapping(target = "likedUsers", expression = "java(mapLikedUsers(post.getLikes()))")
-    @Mapping(target = "originalPostId", source = "originalPost.postId")
+    @Mapping(target = "originalPostId", source = "originalPostId")
     @Mapping(target = "originalPost", expression = "java(post.getOriginalPost() != null ? toPostResponse(post.getOriginalPost()) : null)")
     UserPostOnlyResponse toUserPostOnlyResponse(Post post);
 }
