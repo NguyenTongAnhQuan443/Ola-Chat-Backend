@@ -808,4 +808,23 @@ public class PostServiceImpl implements PostService {
                 .build();
         favoriteRepository.save(favorite);
     }
+
+    @Override
+    public void removePostFromFavorites(Long postId) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra nếu bài viết đã được thêm vào danh sách yêu thích
+        Favorite favorite = favoriteRepository.findByPostAndUser(post, currentUser)
+                .orElseThrow(() -> new BadRequestException("Post is not in your favorites"));
+
+        // Xóa bài viết khỏi danh sách yêu thích
+        favoriteRepository.delete(favorite);
+    }
 }

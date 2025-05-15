@@ -32,4 +32,5 @@ public interface PostService {
     List<PostResponse> searchPosts(String keyword, int page, int size);
     PostResponse updatePostPrivacy(Long postId, String privacy);
     void addPostToFavorites(Long postId);
+    void removePostFromFavorites(Long postId);
 }

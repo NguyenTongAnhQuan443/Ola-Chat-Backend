@@ -270,4 +270,14 @@ public class PostController {
                         .build()
         );
     }
+
+    @DeleteMapping("/{postId}/favorite")
+    public ResponseEntity<MessageResponse<String>> removePostFromFavorites(@PathVariable Long postId) {
+        postService.removePostFromFavorites(postId);
+        return ResponseEntity.ok(
+                MessageResponse.<String>builder()
+                        .message("Post removed from favorites successfully")
+                        .build()
+        );
+    }
 }
