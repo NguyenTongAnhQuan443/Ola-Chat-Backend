@@ -40,6 +40,9 @@ public class PostServiceImpl implements PostService {
     @Autowired
     private PostMapper postMapper;
 
+    @Autowired
+    private FavoriteRepository favoriteRepository;
+
     public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
@@ -769,5 +772,40 @@ public class PostServiceImpl implements PostService {
 
         // Trả về PostResponse
         return postMapper.toPostResponse(post);
+    }
+
+    @Override
+    public void addPostToFavorites(Long postId) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền truy cập bài đăng
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to favorite this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to favorite this post");
+        }
+
+        // Kiểm tra nếu bài viết đã được thêm vào danh sách yêu thích
+        boolean alreadyFavorited = favoriteRepository.existsByPostAndUser(post, currentUser);
+        if (alreadyFavorited) {
+            throw new BadRequestException("Post is already in your favorites");
+        }
+
+        // Lưu bài viết vào danh sách yêu thích
+        Favorite favorite = Favorite.builder()
+                .post(post)
+                .user(currentUser)
+                .createdAt(LocalDateTime.now())
+                .build();
+        favoriteRepository.save(favorite);
     }
 }

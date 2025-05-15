@@ -260,4 +260,14 @@ public class PostController {
                         .build()
         );
     }
+
+    @PostMapping("/{postId}/favorite")
+    public ResponseEntity<MessageResponse<String>> addPostToFavorites(@PathVariable Long postId) {
+        postService.addPostToFavorites(postId);
+        return ResponseEntity.ok(
+                MessageResponse.<String>builder()
+                        .message("Post added to favorites successfully")
+                        .build()
+        );
+    }
 }
