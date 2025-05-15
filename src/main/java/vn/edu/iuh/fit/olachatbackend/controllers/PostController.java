@@ -111,6 +111,17 @@ public class PostController {
         );
     }
 
+    @GetMapping("/{postId}/shares")
+    public ResponseEntity<MessageResponse<List<ShareResponse>>> getPostShares(@PathVariable Long postId) {
+        List<ShareResponse> shares = postService.getPostShares(postId);
+        return ResponseEntity.ok(
+                MessageResponse.<List<ShareResponse>>builder()
+                        .message("Shares retrieved successfully")
+                        .data(shares)
+                        .build()
+        );
+    }
+
     @PostMapping("/{postId}/like")
     public ResponseEntity<MessageResponse<String>> likePost(@PathVariable Long postId) {
         postService.likePost(postId);

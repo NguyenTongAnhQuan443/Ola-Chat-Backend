@@ -355,6 +355,25 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    public List<ShareResponse> getPostShares(Long postId) {
+        // Validate the post exists
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Retrieve the shares for the post
+        List<Share> shares = shareRepository.findByPost(post);
+
+        // Map the shares to ShareResponse
+        return shares.stream()
+                .map(share -> ShareResponse.builder()
+                        .shareId(share.getShareId())
+                        .sharedBy(postMapper.userToPostUserResponse(share.getSharedBy()))
+                        .sharedAt(share.getSharedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
     public void likePost(Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
