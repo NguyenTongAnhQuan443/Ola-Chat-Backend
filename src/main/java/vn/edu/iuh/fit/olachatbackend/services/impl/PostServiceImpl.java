@@ -745,4 +745,29 @@ public class PostServiceImpl implements PostService {
                 })
                 .toList();
     }
+
+    @Override
+    public PostResponse updatePostPrivacy(Long postId, String privacy) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền cập nhật
+        if (!post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to update this post");
+        }
+
+        // Cập nhật Privacy
+        post.setPrivacy(Privacy.valueOf(privacy.toUpperCase()));
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        // Trả về PostResponse
+        return postMapper.toPostResponse(post);
+    }
 }

@@ -247,4 +247,17 @@ public class PostController {
                         .build()
         );
     }
+
+    @PutMapping("/{postId}/privacy")
+    public ResponseEntity<MessageResponse<PostResponse>> updatePostPrivacy(
+            @PathVariable Long postId,
+            @RequestParam("privacy") String privacy) {
+        PostResponse updatedPost = postService.updatePostPrivacy(postId, privacy);
+        return ResponseEntity.ok(
+                MessageResponse.<PostResponse>builder()
+                        .message("Post privacy updated successfully")
+                        .data(updatedPost)
+                        .build()
+        );
+    }
 }

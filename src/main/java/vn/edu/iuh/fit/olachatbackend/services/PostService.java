@@ -30,4 +30,5 @@ public interface PostService {
     UserPostsResponse getUserProfilePosts(String userId, int page, int size);
     List<PostUserResponse> getPostLikes(Long postId);
     List<PostResponse> searchPosts(String keyword, int page, int size);
+    PostResponse updatePostPrivacy(Long postId, String privacy);
 }
