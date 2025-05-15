@@ -46,10 +46,13 @@ public class Post {
     private List<Like> likes = new ArrayList<>();
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference // Mark this as the parent reference
+    @JsonManagedReference
     private List<Comment> comments;
 
-    @ManyToOne
+    @Column(name = "post_id_original")
+    private Long originalPostId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "original_post_id")
     private Post originalPost;
 }

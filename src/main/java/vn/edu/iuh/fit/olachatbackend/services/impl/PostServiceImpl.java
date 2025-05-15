@@ -1,14 +1,15 @@
 package vn.edu.iuh.fit.olachatbackend.services.impl;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentHierarchyResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.CommentedByResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
@@ -23,6 +24,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class PostServiceImpl implements PostService {
@@ -30,18 +33,22 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final MediaService mediaService;
     private final LikeRepository likeRepository;
-    private final PostMapper postMapper;
     private final FriendRepository friendRepository;
     private final CommentRepository commentRepository;
     private final CommentService commentService;
     private final ShareRepository shareRepository;
 
-    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, PostMapper postMapper, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
+    @Autowired
+    private PostMapper postMapper;
+
+    @Autowired
+    private FavoriteRepository favoriteRepository;
+
+    public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.mediaService = mediaService;
         this.likeRepository = likeRepository;
-        this.postMapper = postMapper;
         this.friendRepository = friendRepository;
         this.commentRepository = commentRepository;
         this.commentService = commentService;
@@ -49,17 +56,15 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    public Post createPost(String content, String privacy, List<Media> mediaList) {
+    public PostResponse createPost(String content, String privacy, List<Media> mediaList) {
         if ((content == null || content.isEmpty()) && (mediaList == null || mediaList.isEmpty())) {
             throw new BadRequestException("Post must have either content or media.");
         }
 
-        // Retrieve the currently authenticated user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Create the post
         Post post = Post.builder()
                 .content(content)
                 .attachments(mediaList)
@@ -68,199 +73,185 @@ public class PostServiceImpl implements PostService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // Associate each media with the post
         if (mediaList != null) {
             for (Media media : mediaList) {
                 media.setPost(post);
             }
         }
 
-        // Save the post
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+
+        return postMapper.toPostResponse(savedPost);
     }
 
     @Override
     public PostResponse getPostById(Long postId) {
-        // Retrieve the post from the database
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Retrieve the current user
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Check access based on privacy
         if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to access this post");
-        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser) && !post.getCreatedBy().equals(currentUser)) {
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to access this post");
         }
 
-        // Fetch all comments and build hierarchy
+        Post originalPost = post.getOriginalPost();
+
+        if (originalPost != null) {
+            boolean canViewOriginal = true;
+
+            if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                    !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                canViewOriginal = false;
+            }
+
+            if (!canViewOriginal) {
+                post.setOriginalPost(null);
+            }
+        }
+
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
-        // Map the post to PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
-        postResponse.setLikedUsers(likedUsers);
 
         return postResponse;
     }
 
     @Override
-    public List<PostResponse> getUserPosts() {
-        // Retrieve the currently authenticated user
+    public UserPostsResponse getUserPosts(int page, int size) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Fetch posts created by the current user
-        List<Post> posts = postRepository.findByCreatedBy(currentUser);
-        List<PostResponse> postResponses = new ArrayList<>();
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable);
 
-        for (Post post : posts) {
-            // Fetch all comments and build hierarchy
+        List<UserPostOnlyResponse> postResponses = postPage.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null);
+                }
+            }
+
             List<Comment> allComments = commentService.findAllByPost(post);
             List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-            // Fetch all users who liked the post
-            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                    .map(Like::getLikedBy)
-                    .toList();
-
-            // Map the post to PostResponse
-            PostResponse postResponse = postMapper.toPostResponse(post);
+            UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
             postResponse.setComments(commentHierarchy);
-            postResponse.setLikedUsers(likedUsers);
 
-            postResponses.add(postResponse);
-        }
+            return postResponse;
+        }).collect(Collectors.toList());
 
-        return postResponses;
+        PostUserResponse createdBy = postMapper.userToPostUserResponse(currentUser);
+
+        return new UserPostsResponse(
+                createdBy,
+                postResponses,
+                postPage.getTotalPages(),
+                postPage.getNumber() + 1,
+                postPage.getSize()
+        );
     }
 
-//    @Override
-//    public List<PostResponse> getAllPosts() {
-//        List<Post> posts = postRepository.findAll();
-//        List<PostResponse> postResponses = new ArrayList<>();
-//
-//        for (Post post : posts) {
-//            // Fetch all comments and build hierarchy
-//            List<Comment> allComments = commentService.findAllByPost(post);
-//            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-//
-//            // Fetch all users who liked the post
-//            List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-//                    .map(Like::getLikedBy)
-//                    .toList();
-//
-//            // Map the post to PostResponse
-//            PostResponse postResponse = postMapper.toPostResponse(post);
-//            postResponse.setComments(commentHierarchy);
-//            postResponse.setLikedUsers(likedUsers);
-//
-//            postResponses.add(postResponse);
-//        }
-//
-//        return postResponses;
-//    }
-
-    @Override
     @Transactional
-    public List<PostResponse> deletePostByIdAndReturnRemaining(Long postId) throws IOException {
-        // Fetch the post from the database
+    public void deletePostById(Long postId) throws IOException {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Check if the post is a shared post
-        if (post.getOriginalPost() != null) {
-            // Retrieve the current user
-            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-            User currentUser = userRepository.findByUsername(currentUsername)
-                    .orElseThrow(() -> new NotFoundException("User not found"));
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
-            // Delete the specific entry in the post_share table
-            shareRepository.deleteByPostAndSharedBy(post.getOriginalPost(), currentUser);
+        if (!post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to delete this post");
         }
 
-        // Delete associated media using MediaService
+        // Ngắt liên kết các bài share đã tham chiếu bài này
+        List<Post> sharedPosts = postRepository.findByOriginalPost(post);
+        for (Post sharedPost : sharedPosts) {
+            sharedPost.setOriginalPost(null);
+            postRepository.save(sharedPost);
+        }
+
+        // Xóa các bản ghi share, like, comment liên quan (nếu có)
+        shareRepository.deleteBySharedPost(post);
+        List<Share> sharesToDelete = shareRepository.findByPost(post);
+        shareRepository.deleteAll(sharesToDelete);
+
         if (post.getAttachments() != null && !post.getAttachments().isEmpty()) {
             mediaService.deleteMediaFromCloudinary(post.getAttachments());
         }
 
-        // Delete all likes associated with the post
         likeRepository.deleteAllByPost(post);
-
-        // Delete all comments associated with the post
         commentRepository.deleteAllByPost(post);
 
-        // Delete the post from the database
         postRepository.delete(post);
-
-        // Fetch all remaining posts
-        List<Post> remainingPosts = postRepository.findAll();
-        List<PostResponse> postResponses = new ArrayList<>();
-
-        for (Post remainingPost : remainingPosts) {
-            // Fetch all comments and build hierarchy
-            List<Comment> allComments = commentService.findAllByPost(remainingPost);
-            List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-            // Fetch all users who liked the post
-            List<User> likedUsers = likeRepository.findAllByPost(remainingPost).stream()
-                    .map(Like::getLikedBy)
-                    .toList();
-
-            // Map the post to PostResponse
-            PostResponse postResponse = postMapper.toPostResponse(remainingPost);
-            postResponse.setComments(commentHierarchy);
-            postResponse.setLikedUsers(likedUsers);
-
-            postResponses.add(postResponse);
-        }
-
-        return postResponses;
     }
 
     @Override
     public PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException {
-        // Lấy bài đăng từ DB
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Kiểm tra quyền sở hữu bài đăng
         if (!post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to update this post");
         }
 
-        // Kiểm tra nếu bài đăng là bài share
-        if (post.getOriginalPost() != null) {
-            // Chỉ cho phép cập nhật content
+        Post originalPost = post.getOriginalPost();
+        boolean hideOriginalPost = false;
+
+        if (originalPost != null) {
+            // Là bài share => chỉ được sửa content
             if (content != null && !content.isEmpty()) {
                 post.setContent(content);
             } else {
                 throw new BadRequestException("Shared posts can only update content.");
             }
-        } else {
 
-            // Cập nhật content nếu có
+            // Kiểm tra quyền xem bài gốc
+            if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
+                hideOriginalPost = true;
+            } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                    !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                    !originalPost.getCreatedBy().equals(currentUser)) {
+                hideOriginalPost = true;
+            }
+
+        } else {
+            // Là bài viết bình thường
             if (content != null && !content.isEmpty()) {
                 post.setContent(content);
             }
 
-            // Xóa media nếu có filesToDelete
             if (filesToDelete != null && !filesToDelete.isEmpty()) {
                 List<Media> mediaToDelete = post.getAttachments().stream()
                         .filter(media -> filesToDelete.contains(media.getPublicId()))
@@ -270,7 +261,6 @@ public class PostServiceImpl implements PostService {
                 post.getAttachments().removeAll(mediaToDelete);
             }
 
-            // Thêm media mới nếu có newFiles
             if (newFiles != null && !newFiles.isEmpty()) {
                 List<Media> newMedia = new ArrayList<>();
                 for (MultipartFile file : newFiles) {
@@ -281,34 +271,28 @@ public class PostServiceImpl implements PostService {
                 post.getAttachments().addAll(newMedia);
             }
         }
-        // Cập nhật updatedAt
-        post.setUpdatedAt(LocalDateTime.now());
 
-        // Lưu bài đăng
+        post.setUpdatedAt(LocalDateTime.now());
         postRepository.save(post);
 
-        // Lấy tất cả bình luận của bài đăng và xây dựng cấu trúc phân cấp
         List<Comment> allComments = commentService.findAllByPost(post);
         List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
 
-        // Lấy tất cả người dùng đã thích bài đăng
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
-        // Map bài đăng sang PostResponse
         PostResponse postResponse = postMapper.toPostResponse(post);
         postResponse.setComments(commentHierarchy);
-        postResponse.setLikedUsers(likedUsers);
+
+        // Nếu không có quyền xem bài gốc, thì ẩn nội dung bài gốc trong phản hồi
+        if (hideOriginalPost) {
+            postResponse.setOriginalPost(null);
+        }
 
         return postResponse;
     }
 
-
     @Override
-    public PostResponse likePost(Long postId) {
-        // Retrieve the post
-        Post post = postRepository.findById(postId)
+    public PostResponse sharePost(Long postId, String content, String privacy) {
+        // Retrieve the post to share
+        Post postToShare = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
         // Retrieve the current user
@@ -316,41 +300,38 @@ public class PostServiceImpl implements PostService {
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Check access based on privacy
-        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to like this post");
-        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
-            throw new BadRequestException("You do not have permission to like this post");
+        // Determine the original post
+        Post originalPost = postToShare.getOriginalPost() != null ? postToShare.getOriginalPost() : postToShare;
+
+        // Check sharing permissions
+        if (!canSharePost(originalPost, currentUser)) {
+            throw new BadRequestException("You do not have permission to share this post.");
         }
 
-        // Check if the user already liked the post
-        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
-        if (alreadyLiked) {
-            throw new BadRequestException("You have already liked this post");
-        }
-
-        // Add the like
-        Like like = Like.builder()
-                .post(post)
-                .likedBy(currentUser)
+        // Create a new shared post
+        Post sharedPost = Post.builder()
+                .content(content)
+                .attachments(null) // No attachments for shared posts
+                .privacy(Privacy.valueOf(privacy.toUpperCase())) // Use provided privacy or default to PUBLIC
+                .createdBy(currentUser)
+                .createdAt(LocalDateTime.now())
+                .originalPost(originalPost)
+                .originalPostId(originalPost.getPostId())
                 .build();
-        likeRepository.save(like);
 
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
+        // Save the shared post
+        Post savedPost = postRepository.save(sharedPost);
 
-        // Fetch all comments and build hierarchy
-        List<Comment> allComments = commentService.findAllByPost(post);
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
+        // Save the share record
+        Share share = Share.builder()
+                .post(originalPost)
+                .sharedPost(savedPost)
+                .sharedBy(currentUser)
+                .sharedAt(LocalDateTime.now())
+                .build();
+        shareRepository.save(share);
 
-        // Map the post to PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setLikedUsers(likedUsers);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
+        return postMapper.toPostResponse(savedPost);
     }
 
     // Helper method to check if two users are friends
@@ -360,62 +341,125 @@ public class PostServiceImpl implements PostService {
                 .isPresent();
     }
 
+    private boolean canSharePost(Post post, User currentUser) {
+        // Người tạo được quyền chia sẻ bài của chính họ
+        if (post.getCreatedBy().equals(currentUser)) {
+            return true;
+        }
+
+        return switch (post.getPrivacy()) {
+            case PUBLIC -> true;
+            case FRIENDS -> isFriend(post.getCreatedBy(), currentUser);
+            case PRIVATE -> false;
+        };
+    }
+
     @Override
-    public PostResponse toggleLikePost(Long postId) {
-        // Retrieve the post
+    public List<ShareResponse> getPostShares(Long postId) {
+        // Validate the post exists
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
 
-        // Retrieve the current user
+        // Retrieve the shares for the post
+        List<Share> shares = shareRepository.findByPost(post);
+
+        // Map the shares to ShareResponse
+        return shares.stream()
+                .map(share -> ShareResponse.builder()
+                        .shareId(share.getShareId())
+                        .sharedBy(postMapper.userToPostUserResponse(share.getSharedBy()))
+                        .sharedAt(share.getSharedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    public void likePost(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Check access based on privacy
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
+            throw new BadRequestException("You do not have permission to like this post");
+        }
+
+        boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
+        if (alreadyLiked) {
+            throw new BadRequestException("You have already liked this post");
+        }
+
+        Like like = Like.builder()
+                .post(post)
+                .likedBy(currentUser)
+                .build();
+        likeRepository.save(like);
+    }
+
+    @Override
+    public List<PostUserResponse> getPostLikes(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền truy cập bài đăng
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to view likes for this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to view likes for this post");
+        }
+
+        // Lấy danh sách người thích bài đăng
+        return likeRepository.findAllByPost(post).stream()
+                .map(like -> postMapper.userToPostUserResponse(like.getLikedBy()))
+                .toList();
+    }
+
+    @Override
+    public boolean toggleLikePost(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
         if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
             throw new BadRequestException("You do not have permission to like/unlike this post");
         } else if (post.getPrivacy() == Privacy.FRIENDS && !isFriend(post.getCreatedBy(), currentUser)) {
             throw new BadRequestException("You do not have permission to like/unlike this post");
         }
 
-        // Check if the user already liked the post
         boolean alreadyLiked = likeRepository.existsByPostAndLikedBy(post, currentUser);
 
         if (alreadyLiked) {
-            // Unlike the post
             Like like = likeRepository.findAllByPost(post).stream()
                     .filter(l -> l.getLikedBy().equals(currentUser))
                     .findFirst()
                     .orElseThrow(() -> new NotFoundException("Like not found"));
             likeRepository.delete(like);
+            return true; // Unliked
         } else {
-            // Like the post
             Like like = Like.builder()
                     .post(post)
                     .likedBy(currentUser)
                     .build();
             likeRepository.save(like);
+            return false; // Liked
         }
-
-        // Fetch all users who liked the post
-        List<User> likedUsers = likeRepository.findAllByPost(post).stream()
-                .map(Like::getLikedBy)
-                .toList();
-
-        // Fetch all comments and build hierarchy
-        List<Comment> allComments = commentService.findAllByPost(post);
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-        // Map the post to PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setLikedUsers(likedUsers);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
     }
 
     @Override
-    public PostResponse addCommentToPost(Long postId, String content) {
+    public List<CommentHierarchyResponse> addCommentToPost(Long postId, String content) {
         // Lấy bài đăng từ DB
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
@@ -447,13 +491,7 @@ public class PostServiceImpl implements PostService {
         List<Comment> allComments = commentService.findAllByPost(post);
 
         // Xây dựng cấu trúc phân cấp cho bình luận
-        List<CommentHierarchyResponse> commentHierarchy = commentService.buildCommentHierarchy(allComments);
-
-        // Map bài đăng sang PostResponse
-        PostResponse postResponse = postMapper.toPostResponse(post);
-        postResponse.setComments(commentHierarchy);
-
-        return postResponse;
+        return commentService.buildCommentHierarchy(allComments);
     }
 
     @Override
@@ -548,7 +586,8 @@ public class PostServiceImpl implements PostService {
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
-                .commentedBy(CommentedByResponse.builder()
+                .commentedBy(PostUserResponse.builder()
+                        .userId(currentUser.getId())
                         .username(currentUser.getUsername())
                         .displayName(currentUser.getDisplayName())
                         .avatar(currentUser.getAvatar())
@@ -557,50 +596,6 @@ public class PostServiceImpl implements PostService {
                 .build();
     }
 
-    @Override
-    public PostResponse sharePost(Long postId, String content) {
-        // Retrieve the original post
-        Post originalPost = postRepository.findById(postId)
-                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
-
-        // Retrieve the current user
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new NotFoundException("User not found"));
-
-        // Check sharing permissions based on privacy
-        if (originalPost.getPrivacy() == Privacy.PRIVATE && !originalPost.getCreatedBy().equals(currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        } else if (originalPost.getPrivacy() == Privacy.FRIENDS && !isFriend(originalPost.getCreatedBy(), currentUser)) {
-            throw new BadRequestException("You do not have permission to share this post");
-        }
-
-        // Create the shared post
-        Post sharedPost = Post.builder()
-                .content(content) // Content of the shared post
-                .attachments(null) // Shared posts do not have attachments
-                .privacy(Privacy.PUBLIC) // Default privacy for shared posts
-                .createdBy(currentUser)
-                .createdAt(LocalDateTime.now())
-                .originalPost(originalPost) // Reference to the original post
-                .build();
-
-        // Save the shared post
-        Post savedPost = postRepository.save(sharedPost);
-
-        // Save the share information in the Share table
-        Share share = Share.builder()
-                .post(originalPost)
-                .sharedBy(currentUser)
-                .sharedAt(LocalDateTime.now())
-                .build();
-        shareRepository.save(share);
-
-        // Map the shared post to PostResponse
-        return postMapper.toPostResponse(savedPost);
-    }
-
-    @Override
     public List<PostResponse> getFeed(int page, int size) {
         // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -628,13 +623,35 @@ public class PostServiceImpl implements PostService {
                 .toList();
 
         // Map sang PostResponse
-        return posts.stream()
-                .map(postMapper::toPostResponse)
-                .toList();
+        return posts.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null);
+                }
+            }
+
+            PostResponse postResponse = postMapper.toPostResponse(post);
+
+            return postResponse;
+        }).toList();
     }
 
     @Override
-    public List<PostResponse> getUserProfilePosts(String userId, int page, int size) {
+    public UserPostsResponse getUserProfilePosts(String userId, int page, int size) {
         // Lấy người dùng hiện tại
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(currentUsername)
@@ -650,22 +667,230 @@ public class PostServiceImpl implements PostService {
                 .isPresent();
 
         // Lấy danh sách bài đăng dựa trên quyền riêng tư
-        List<Post> posts;
+        Page<Post> posts;
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         if (currentUser.equals(profileUser)) {
-            // Chính chủ: Hiển thị tất cả bài đăng
             posts = postRepository.findByCreatedBy(profileUser, pageRequest);
         } else if (isFriend) {
-            // Bạn bè: Hiển thị bài đăng PUBLIC và FRIENDS
             posts = postRepository.findByCreatedByAndPrivacyIn(profileUser, List.of(Privacy.PUBLIC, Privacy.FRIENDS), pageRequest);
         } else {
-            // Không phải bạn bè: Chỉ hiển thị bài đăng PUBLIC
             posts = postRepository.findByCreatedByAndPrivacy(profileUser, Privacy.PUBLIC, pageRequest);
         }
 
-        // Map sang PostResponse
+        // Map danh sách bài đăng sang UserPostOnlyResponse
+        List<UserPostOnlyResponse> postResponses = posts.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null); // Ẩn chi tiết bài gốc
+                }
+            }
+
+            UserPostOnlyResponse postResponse = postMapper.toUserPostOnlyResponse(post);
+
+            return postResponse;
+        }).toList();
+
+        // Tạo thông tin người dùng
+        PostUserResponse createdBy = postMapper.userToPostUserResponse(profileUser);
+
+        // Trả về UserPostsResponse
+        return new UserPostsResponse(
+                createdBy,
+                postResponses,
+                posts.getTotalPages(),
+                posts.getNumber() + 1,
+                posts.getSize()
+        );
+    }
+
+    @Override
+    public List<PostResponse> searchPosts(String keyword, int page, int size) {
+        // Lấy tên người dùng hiện tại từ SecurityContext
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Tạo đối tượng phân trang
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // Tìm các bài viết có nội dung chứa từ khóa (không phân biệt hoa thường)
+        Page<Post> posts = postRepository.findByContentContainingIgnoreCase(keyword, pageable);
+
+        // Lọc bài viết dựa trên quyền riêng tư và mối quan hệ bạn bè
         return posts.stream()
-                .map(postMapper::toPostResponse)
+                .filter(post -> {
+                    if (post.getCreatedBy().equals(currentUser)) {
+                        return true; // Hiển thị tất cả bài viết của chính người dùng
+                    } else if (isFriend(post.getCreatedBy(), currentUser)) {
+                        // Hiển thị bài viết công khai hoặc chỉ bạn bè
+                        return post.getPrivacy() == Privacy.PUBLIC || post.getPrivacy() == Privacy.FRIENDS;
+                    } else {
+                        // Chỉ hiển thị bài viết công khai
+                        return post.getPrivacy() == Privacy.PUBLIC;
+                    }
+                })
+                .map(post -> {
+                    // Kiểm tra quyền xem bài gốc nếu bài viết là bài chia sẻ
+                    Post originalPost = post.getOriginalPost();
+                    if (originalPost != null) {
+                        boolean canViewOriginal = true;
+
+                        if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                                !originalPost.getCreatedBy().equals(currentUser)) {
+                            canViewOriginal = false;
+                        } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                                !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                                !originalPost.getCreatedBy().equals(currentUser)) {
+                            canViewOriginal = false;
+                        }
+
+                        if (!canViewOriginal) {
+                            post.setOriginalPost(null); // Ẩn bài gốc nếu không có quyền xem
+                        }
+                    }
+
+                    // Chuyển đổi bài viết sang PostResponse
+                    return postMapper.toPostResponse(post);
+                })
                 .toList();
+    }
+
+    @Override
+    public PostResponse updatePostPrivacy(Long postId, String privacy) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền cập nhật
+        if (!post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to update this post");
+        }
+
+        // Cập nhật Privacy
+        post.setPrivacy(Privacy.valueOf(privacy.toUpperCase()));
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        // Trả về PostResponse
+        return postMapper.toPostResponse(post);
+    }
+
+    @Override
+    public void addPostToFavorites(Long postId) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra quyền truy cập bài đăng
+        if (post.getPrivacy() == Privacy.PRIVATE && !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to favorite this post");
+        } else if (post.getPrivacy() == Privacy.FRIENDS &&
+                !isFriend(post.getCreatedBy(), currentUser) &&
+                !post.getCreatedBy().equals(currentUser)) {
+            throw new BadRequestException("You do not have permission to favorite this post");
+        }
+
+        // Kiểm tra nếu bài viết đã được thêm vào danh sách yêu thích
+        boolean alreadyFavorited = favoriteRepository.existsByPostAndUser(post, currentUser);
+        if (alreadyFavorited) {
+            throw new BadRequestException("Post is already in your favorites");
+        }
+
+        // Lưu bài viết vào danh sách yêu thích
+        Favorite favorite = Favorite.builder()
+                .post(post)
+                .user(currentUser)
+                .createdAt(LocalDateTime.now())
+                .build();
+        favoriteRepository.save(favorite);
+    }
+
+    @Override
+    public void removePostFromFavorites(Long postId) {
+        // Lấy bài viết từ DB
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found with id: " + postId));
+
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Kiểm tra nếu bài viết đã được thêm vào danh sách yêu thích
+        Favorite favorite = favoriteRepository.findByPostAndUser(post, currentUser)
+                .orElseThrow(() -> new BadRequestException("Post is not in your favorites"));
+
+        // Xóa bài viết khỏi danh sách yêu thích
+        favoriteRepository.delete(favorite);
+    }
+
+    @Override
+    public List<PostResponse> getUserFavorites(int page, int size) {
+        // Get the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Get the user's favorite posts
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        List<Favorite> favorites = favoriteRepository.findAllByUser(currentUser, pageable);
+
+        return favorites.stream()
+                .map(favorite -> {
+                    Post post = favorite.getPost();
+
+                    // Check privacy of the post
+                    if (!canViewPost(post, currentUser)) {
+                        // Return minimal response with only postId
+                        return PostResponse.builder()
+                                .postId(post.getPostId())
+                                .build();
+                    }
+
+                    // Check privacy of the original post if it's a shared post
+                    Post originalPost = post.getOriginalPost();
+                    if (originalPost != null && !canViewPost(originalPost, currentUser)) {
+                        post.setOriginalPost(null); // Hide original post details
+                    }
+
+                    return postMapper.toPostResponse(post);
+                })
+                .toList();
+    }
+
+    private boolean canViewPost(Post post, User currentUser) {
+        if (post.getCreatedBy().equals(currentUser)) {
+            return true; // User can view their own posts
+        }
+
+        return switch (post.getPrivacy()) {
+            case PUBLIC -> true;
+            case FRIENDS -> isFriend(post.getCreatedBy(), currentUser);
+            case PRIVATE -> false;
+        };
     }
 }
