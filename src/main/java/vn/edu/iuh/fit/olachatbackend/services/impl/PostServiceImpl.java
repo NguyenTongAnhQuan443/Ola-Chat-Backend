@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -826,5 +827,51 @@ public class PostServiceImpl implements PostService {
 
         // Xóa bài viết khỏi danh sách yêu thích
         favoriteRepository.delete(favorite);
+    }
+
+    @Override
+    public List<PostResponse> getUserFavorites(int page, int size) {
+        // Get the current user
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Get the user's favorite posts
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        List<Favorite> favorites = favoriteRepository.findAllByUser(currentUser, pageable);
+
+        return favorites.stream()
+                .map(favorite -> {
+                    Post post = favorite.getPost();
+
+                    // Check privacy of the post
+                    if (!canViewPost(post, currentUser)) {
+                        // Return minimal response with only postId
+                        return PostResponse.builder()
+                                .postId(post.getPostId())
+                                .build();
+                    }
+
+                    // Check privacy of the original post if it's a shared post
+                    Post originalPost = post.getOriginalPost();
+                    if (originalPost != null && !canViewPost(originalPost, currentUser)) {
+                        post.setOriginalPost(null); // Hide original post details
+                    }
+
+                    return postMapper.toPostResponse(post);
+                })
+                .toList();
+    }
+
+    private boolean canViewPost(Post post, User currentUser) {
+        if (post.getCreatedBy().equals(currentUser)) {
+            return true; // User can view their own posts
+        }
+
+        return switch (post.getPrivacy()) {
+            case PUBLIC -> true;
+            case FRIENDS -> isFriend(post.getCreatedBy(), currentUser);
+            case PRIVATE -> false;
+        };
     }
 }

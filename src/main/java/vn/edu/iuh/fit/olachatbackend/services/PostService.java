@@ -33,4 +33,5 @@ public interface PostService {
     PostResponse updatePostPrivacy(Long postId, String privacy);
     void addPostToFavorites(Long postId);
     void removePostFromFavorites(Long postId);
+    List<PostResponse> getUserFavorites(int page, int size);
 }

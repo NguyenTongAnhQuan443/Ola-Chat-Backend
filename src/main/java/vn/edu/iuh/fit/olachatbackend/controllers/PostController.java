@@ -280,4 +280,17 @@ public class PostController {
                         .build()
         );
     }
+
+    @GetMapping("/favorites")
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserFavorites(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<PostResponse> favoritePosts = postService.getUserFavorites(page, size);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("Favorite posts retrieved successfully")
+                        .data(favoritePosts)
+                        .build()
+        );
+    }
 }
