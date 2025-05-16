@@ -29,7 +29,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final String[] PUBLIC_ENDPOINTS = {
-            "/auth/login", "/auth/introspect", "/auth/logout", "/auth/forgot-password", "/auth/reset-password","/app/**",
+            "/auth/login/**", "/auth/introspect", "/auth/logout", "/auth/forgot-password", "/auth/reset-password","/app/**",
             "/auth/refresh",
             "/v3/api-docs/**", "/swagger-ui/**",
             "/api/messages/**",
@@ -42,6 +42,7 @@ public class SecurityConfig {
             "/api/notifications/register-device",
 //            "/api/notifications/**",
             "/users"
+
     };
 
     private final String[] ADMIN_ENDPOINTS = { "/api/users",
