@@ -2,13 +2,21 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaPostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaUserPostResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.PostUserResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserMediaResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Media;
+import vn.edu.iuh.fit.olachatbackend.entities.Post;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
+import vn.edu.iuh.fit.olachatbackend.repositories.FriendRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MediaRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
@@ -17,12 +25,16 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class MediaServiceImpl implements MediaService {
     private final Cloudinary cloudinary;
     private final MediaRepository mediaRepository;
     private final UserRepository userRepository;
+
+    @Autowired
+    private FriendRepository friendRepository;
 
     public MediaServiceImpl(Cloudinary cloudinary, MediaRepository mediaRepository, UserRepository userRepository) {
         this.cloudinary = cloudinary;
@@ -83,40 +95,82 @@ public class MediaServiceImpl implements MediaService {
     }
 
     @Override
-    public List<Media> getMediaByUserId(String userId) {
-        // Kiểm tra user có tồn tại không
-        User user = userRepository.findById(userId)
+    public UserMediaResponse getMediaByUserId(String userId) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("Current user not found"));
+
+        User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
 
-        // Truy vấn danh sách media theo user và sắp xếp
-        return mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(user);
+        List<Media> allMedia = mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(targetUser);
+
+        List<MediaUserPostResponse> mediaResponses = allMedia.stream()
+                .filter(media -> {
+                    Post post = media.getPost();
+                    if (post == null) return false;
+
+                    if (post.getCreatedBy().equals(currentUser)) return true;
+                    if (post.getPrivacy() == Privacy.PUBLIC) return true;
+                    if (post.getPrivacy() == Privacy.FRIENDS && isFriend(post.getCreatedBy(), currentUser)) return true;
+
+                    return false;
+                })
+                .map(media -> MediaUserPostResponse.builder()
+                        .userId(media.getUploadedBy().getId())
+                        .mediaId(media.getMediaId())
+                        .fileUrl(media.getFileUrl())
+                        .fileType(media.getFileType())
+                        .originalFileName(media.getOriginalFileName())
+                        .publicId(media.getPublicId())
+                        .postId(media.getPost().getPostId())
+                        .build())
+                .collect(Collectors.toList());
+
+        PostUserResponse uploaderInfo = PostUserResponse.builder()
+                .userId(targetUser.getId())
+                .username(targetUser.getUsername())
+                .displayName(targetUser.getDisplayName())
+                .avatar(targetUser.getAvatar())
+                .build();
+
+        return UserMediaResponse.builder()
+                .uploadBy(uploaderInfo)
+                .listMedia(mediaResponses)
+                .build();
     }
 
     @Override
-    public List<Media> deleteMediaByIdAndReturnRemaining(Long mediaId, String userId) throws IOException {
-        // Kiểm tra user có tồn tại không
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+    public void deleteMediaById(Long mediaId) throws IOException {
+        // Lấy user hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("Current user not found"));
 
         // Tìm media theo ID
         Media media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new NotFoundException("Media not found with ID: " + mediaId));
 
-        // Kiểm tra media có thuộc về user không
-        if (!media.getUploadedBy().getId().equals(userId)) {
-            throw new UnauthorizedException("Media does not belong to the user");
+        // Kiểm tra quyền xóa (chỉ chủ sở hữu mới được xóa)
+        if (!media.getUploadedBy().getId().equals(currentUser.getId())) {
+            throw new UnauthorizedException("You are not authorized to delete this media");
         }
 
-        // Xóa media khỏi Cloudinary
+        // Xác định loại tài nguyên để xóa trên Cloudinary
         String resourceType = media.getFileType() != null && media.getFileType().toLowerCase().contains("video")
                 ? "video"
                 : "image";
+
+        // Xóa khỏi Cloudinary
         cloudinary.uploader().destroy(media.getPublicId(), ObjectUtils.asMap("resource_type", resourceType));
 
-        // Xóa media khỏi cơ sở dữ liệu
+        // Xóa khỏi cơ sở dữ liệu
         mediaRepository.delete(media);
+    }
 
-        // Trả về danh sách media còn lại của user
-        return mediaRepository.findByUploadedByOrderByUploadedAtDescPost_PostIdAsc(user);
+    private boolean isFriend(User user1, User user2) {
+        return friendRepository.findByUserIdAndFriendId(user1.getId(), user2.getId())
+                .or(() -> friendRepository.findByUserIdAndFriendId(user2.getId(), user1.getId()))
+                .isPresent();
     }
 }

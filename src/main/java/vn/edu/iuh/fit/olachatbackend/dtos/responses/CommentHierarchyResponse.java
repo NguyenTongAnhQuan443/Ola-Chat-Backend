@@ -17,6 +17,6 @@ public class CommentHierarchyResponse {
     private String content;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt; // New field for last update time
-    private CommentedByResponse commentedBy; // Sender's information
+    private PostUserResponse commentedBy; // Sender's information
     private List<CommentHierarchyResponse> replies;
 }
