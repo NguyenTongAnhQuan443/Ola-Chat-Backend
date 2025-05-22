@@ -5,7 +5,7 @@ pipeline {
         maven 'Maven3'
     }
     environment {
-        REGISTRY = "nguyentonganqhuan"
+        REGISTRY = "nguyentonganhquan"
         IMAGE_NAME = "ola-chat-backend"
         TAG = "latest"
     }
