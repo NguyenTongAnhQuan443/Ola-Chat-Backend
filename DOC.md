@@ -6,3 +6,7 @@
 
 BUILD WITH MVND - Nguyen Quan
 & "C:\Tools\maven-mvnd-1.0.2-windows-amd64\bin\mvnd.cmd" clean install -DskipTests
+
+
+# 
+nguyentonganqhuan/ola-chat-backend:latest
