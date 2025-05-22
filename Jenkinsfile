@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'dev', url: 'https://github.com/NguyenTongAnhQuan443/Ola-Chat-Backend.git'
+                git branch: 'feature/UpdateEtc', url: 'https://github.com/NguyenTongAnhQuan443/Ola-Chat-Backend.git'
             }
         }
         stage('Add Firebase Service Account') {
@@ -25,14 +25,6 @@ pipeline {
         stage('Build') {
             steps {
                 bat 'mvn clean package -DskipTests'
-            }
-        }
-        // --- Inject secret file vào workspace ---
-        stage('Add Firebase Service Account') {
-            steps {
-                withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
-                    bat 'copy %FIREBASE_KEY_FILE% serviceAccountKey.json'
-                }
             }
         }
         stage('Login to DockerHub') {
