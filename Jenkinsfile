@@ -15,6 +15,13 @@ pipeline {
                 git branch: 'dev', url: 'https://github.com/NguyenTongAnhQuan443/Ola-Chat-Backend.git'
             }
         }
+        stage('Add Firebase Service Account') {
+            steps {
+                withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
+                    bat 'copy %FIREBASE_KEY_FILE% src\\main\\resources\\serviceAccountKey.json'
+                }
+            }
+        }
         stage('Build') {
             steps {
                 bat 'mvn clean package -DskipTests'
