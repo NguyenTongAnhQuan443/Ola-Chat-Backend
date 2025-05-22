@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'feature/UpdateEtc', url: 'https://github.com/NguyenTongAnhQuan443/Ola-Chat-Backend.git'
+                git branch: 'dev', url: 'https://github.com/NguyenTongAnhQuan443/Ola-Chat-Backend.git'
             }
         }
         stage('Add Firebase Service Account') {
