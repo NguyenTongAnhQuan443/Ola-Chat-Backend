@@ -20,6 +20,13 @@ pipeline {
                 bat 'mvn clean package -DskipTests'
             }
         }
+        stage('Login to DockerHub') {
+                   steps {
+                       withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
+                           bat 'docker login -u %DOCKER_HUB_USER% -p %DOCKER_HUB_PASS%'
+                       }
+                   }
+               }
         stage('Build Docker Image') {
             steps {
                 bat "docker build -t %REGISTRY%/%IMAGE_NAME%:%TAG% ."
