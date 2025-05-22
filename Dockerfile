@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy file JAR đã build vào container
 COPY target/*.jar OlaChat-Backend-0.0.1-SNAPSHOT.jar
 
+# Copy file serviceAccountKey.json vào container (sẽ copy từ Jenkins workspace)
+COPY serviceAccountKey.json serviceAccountKey.json
+
 # Mở port 8080
 EXPOSE 8080
 
