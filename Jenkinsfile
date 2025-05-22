@@ -20,13 +20,21 @@ pipeline {
                 bat 'mvn clean package -DskipTests'
             }
         }
+        // --- Inject secret file vào workspace ---
+        stage('Add Firebase Service Account') {
+            steps {
+                withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
+                    bat 'copy %FIREBASE_KEY_FILE% serviceAccountKey.json'
+                }
+            }
+        }
         stage('Login to DockerHub') {
-                   steps {
-                       withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
-                           bat 'docker login -u %DOCKER_HUB_USER% -p %DOCKER_HUB_PASS%'
-                       }
-                   }
-               }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
+                    bat 'docker login -u %DOCKER_HUB_USER% -p %DOCKER_HUB_PASS%'
+                }
+            }
+        }
         stage('Build Docker Image') {
             steps {
                 bat "docker build -t %REGISTRY%/%IMAGE_NAME%:%TAG% ."
