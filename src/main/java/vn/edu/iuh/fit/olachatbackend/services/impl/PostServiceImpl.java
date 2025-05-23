@@ -336,7 +336,7 @@ public class PostServiceImpl implements PostService {
 
         // Notification for post owner
         notificationService.notifyUser(postToShare.getCreatedBy().getId(), "Bài viết của bạn được chia sẻ!",
-                currentUser.getDisplayName() + "đã chia sẻ bài viết của bạn.", NotificationType.POST_LIKE, currentUser.getId());
+                currentUser.getDisplayName() + " đã chia sẻ bài viết của bạn.", NotificationType.POST_SHARE, currentUser.getId());
 
         return postMapper.toPostResponse(savedPost);
     }
@@ -408,7 +408,7 @@ public class PostServiceImpl implements PostService {
 
         // Notification for post owner
         notificationService.notifyUser(post.getCreatedBy().getId(), "Ai đó đã thích bài viết của bạn!",
-                currentUser.getDisplayName() + "đã thích bài viết của bạn", NotificationType.POST_LIKE, currentUser.getId());
+                currentUser.getDisplayName() + " đã thích bài viết của bạn", NotificationType.POST_LIKE, currentUser.getId());
 
     }
 
@@ -501,7 +501,7 @@ public class PostServiceImpl implements PostService {
 
         // Notification for post owner
         notificationService.notifyUser(post.getCreatedBy().getId(), " Bạn có bình luận mới!",
-                currentUser.getDisplayName() + "đã để lại bình luận: " + comment.getContent(), NotificationType.POST_COMMENT, currentUser.getId());
+                currentUser.getDisplayName() + " đã để lại bình luận: " + comment.getContent(), NotificationType.POST_COMMENT, currentUser.getId());
 
         // Lấy tất cả bình luận của bài đăng
         List<Comment> allComments = commentService.findAllByPost(post);
@@ -564,6 +564,10 @@ public class PostServiceImpl implements PostService {
 
         // Lưu bình luận trả lời
         commentService.save(replyComment);
+
+        // Notification for comment owner
+        notificationService.notifyUser(parentComment.getCommentedBy().getId(), currentUser.getDisplayName() + " đã trả lời bình luận của bạn",
+                currentUser.getDisplayName() + " đã phản hồi bình luận của bạn: " + content, NotificationType.POST_COMMENT_REPLY, currentUser.getId());
 
         // Lấy tất cả bình luận của bài đăng
         List<Comment> allComments = commentService.findAllByPost(post);
