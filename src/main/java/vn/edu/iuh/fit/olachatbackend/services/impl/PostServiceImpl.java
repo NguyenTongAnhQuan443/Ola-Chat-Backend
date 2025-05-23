@@ -334,6 +334,10 @@ public class PostServiceImpl implements PostService {
                 .build();
         shareRepository.save(share);
 
+        // Notification for post owner
+        notificationService.notifyUser(postToShare.getCreatedBy().getId(), "Bài viết của bạn được chia sẻ!",
+                currentUser.getDisplayName() + "đã chia sẻ bài viết của bạn.", NotificationType.POST_LIKE, currentUser.getId());
+
         return postMapper.toPostResponse(savedPost);
     }
 
