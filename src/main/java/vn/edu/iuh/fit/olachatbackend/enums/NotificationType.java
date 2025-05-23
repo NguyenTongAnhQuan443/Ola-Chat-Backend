@@ -9,7 +9,10 @@ public enum NotificationType {
     MESSAGE("MESSAGE"),
     MENTION("MENTION"),
     GROUP("GROUP"),
-    SYSTEM("SYSTEM");
+    SYSTEM("SYSTEM"),
+    POST_LIKE("POST_LIKE"),
+    POST_COMMENT("POST_COMMENT"),
+    POST_SHARE("POST_SHARE");
 
     private final String value;
 
