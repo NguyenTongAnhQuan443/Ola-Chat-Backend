@@ -495,6 +495,10 @@ public class PostServiceImpl implements PostService {
         // Lưu bình luận vào DB
         commentService.save(comment);
 
+        // Notification for post owner
+        notificationService.notifyUser(post.getCreatedBy().getId(), " Bạn có bình luận mới!",
+                currentUser.getDisplayName() + "đã để lại bình luận: " + comment.getContent(), NotificationType.POST_COMMENT, currentUser.getId());
+
         // Lấy tất cả bình luận của bài đăng
         List<Comment> allComments = commentService.findAllByPost(post);
 
