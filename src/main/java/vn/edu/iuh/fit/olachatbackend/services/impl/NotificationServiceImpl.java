@@ -276,7 +276,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyUser(String receiverId, String title, String body, NotificationType type, String senderId) {
         try {
             if (!receiverId.equals(senderId)) {
-                sendNotificationToAllDevices(receiverId, title, body, type, senderId)
+                sendNotificationToAllDevices(receiverId, title, body, type, senderId);
             }
         } catch (Exception e) {
             logger.error("Error while notifying user: {}", e.getMessage());
