@@ -41,7 +41,10 @@ public class SecurityConfig {
             "/api/friends/**",
             "/api/notifications/register-device",
 //            "/api/notifications/**",
-            "/users"
+            "/users",
+            "/api/subscribe",
+            "/api/weather",
+            "/api/weather/**",
 
     };
 

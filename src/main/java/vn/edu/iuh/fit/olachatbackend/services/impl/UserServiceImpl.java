@@ -12,7 +12,6 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  * @version:    1.0
  */
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,7 +31,6 @@ import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
-import vn.edu.iuh.fit.olachatbackend.exceptions.InternalServerErrorException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
@@ -46,7 +44,6 @@ import vn.edu.iuh.fit.olachatbackend.utils.OtpUtils;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;

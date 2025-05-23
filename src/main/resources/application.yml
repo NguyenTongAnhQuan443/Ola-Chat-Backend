@@ -71,3 +71,8 @@ vonage:
   api-key: ${VONAGE_API_KEY}
   api-secret: ${VONAGE_API_SECRET}
   from: ${VONAGE_SENDER}
+
+weather:
+  api:
+    key: ${WEATHER_API_KEY}
+
