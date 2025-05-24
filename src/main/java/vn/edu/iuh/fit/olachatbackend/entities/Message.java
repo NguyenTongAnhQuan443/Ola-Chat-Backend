@@ -33,18 +33,10 @@ public class Message {
     private List<ReadStatus> readStatus;
     private LocalDateTime createdAt;
 
-    private List<ReplyStatus> replyStatus;
     private List<DeletedStatus> deletedStatus;
     private boolean recalled = false;
     private List<Mention> mentions;
-
-    @Data
-    @Builder
-    public static class ReplyStatus {
-        private String userId;
-        private LocalDateTime repliedAt;
-        private String replyMessageId;
-    }
+    private ObjectId replyTo;
 
     @Data
     @Builder

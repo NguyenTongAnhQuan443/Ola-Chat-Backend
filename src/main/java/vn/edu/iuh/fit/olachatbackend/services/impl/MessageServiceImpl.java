@@ -17,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
-import vn.edu.iuh.fit.olachatbackend.dtos.responses.SenderInfoResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
@@ -60,30 +59,17 @@ public class MessageServiceImpl implements MessageService {
                 .status(MessageStatus.SENT)
                 .deliveryStatus(messageDTO.getDeliveryStatus() == null ? new ArrayList<>() : messageDTO.getDeliveryStatus())
                 .readStatus(messageDTO.getReadStatus() == null ? new ArrayList<>() : messageDTO.getReadStatus())
-                .replyStatus(messageDTO.getReplyStatus() == null ? new ArrayList<>() : messageDTO.getReplyStatus())
                 .deletedStatus(messageDTO.getDeletedStatus() == null ? new ArrayList<>() : messageDTO.getDeletedStatus())
                 .createdAt(LocalDateTime.now())
                 .recalled(messageDTO.isRecalled())
                 .mentions(messageDTO.getMentions() == null ? new ArrayList<>() : messageDTO.getMentions())
+                .replyTo(messageDTO.getReplyTo() == null ? null : new ObjectId(messageDTO.getReplyTo()))
                 .build();
         Message savedMessage = messageRepository.save(message);
 
         conversationService.updateLastMessage(message.getConversationId(), savedMessage);
         return messageDTO;
     }
-
-//    private void updateLastMessage(Message message) {
-//        LastMessage lastMessage = LastMessage.builder()
-//                .messageId(message.getId())
-//                .content(message.getContent())
-//                .createdAt(message.getCreatedAt())
-//                .senderId(message.getSenderId())
-//                .build();
-//
-//        Query query = new Query(Criteria.where("_id").is(message.getConversationId()));
-//        Update update = new Update().set("lastMessage", lastMessage);
-//        mongoTemplate.updateFirst(query, update, Conversation.class);
-//    }
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId) {
         List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId));
@@ -100,25 +86,19 @@ public class MessageServiceImpl implements MessageService {
                             .status(message.getStatus())
                             .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
                             .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
-                            .replyStatus(message.getReplyStatus() == null ? new ArrayList<>() : message.getReplyStatus())
                             .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
                             .createdAt(message.getCreatedAt())
                             .recalled(message.isRecalled())
                             .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
+                            .replyTo(message.getReplyTo() == null ? null : message.getReplyTo().toString())
                             .build();
                 })
                 .toList();
     }
 
-    private SenderInfoResponse toSenderInfo(String senderId) {
-        User user = userRepository.findById(senderId).orElse(null);
-        if (user == null) return null;
-        return new SenderInfoResponse(user.getId(), user.getDisplayName(), user.getAvatar());
-    }
-
     public MessageDTO recallMessage(String messageId, String senderId) {
         System.out.println("Mess" + messageId);
-//         Kiểm tra định dạng Message ID
+        // Kiểm tra định dạng Message ID
         if (messageId == null || !messageId.matches("[0-9a-fA-F]{24}")) {
             throw new IllegalArgumentException("Message ID must be a valid 24-character hex string.");
         }
@@ -146,7 +126,7 @@ public class MessageServiceImpl implements MessageService {
         // Update last message
         conversationService.updateLastMessage(message.getConversationId(), message);
 
-//         Trả về MessageDTO với trạng thái tin nhắn đã thu hồi
+        // Trả về MessageDTO với trạng thái tin nhắn đã thu hồi
         return MessageDTO.builder()
                 .id(message.getId().toHexString())
                 .senderId(message.getSenderId())
@@ -267,7 +247,6 @@ public class MessageServiceImpl implements MessageService {
         messageRepository.save(message);
     }
 
-
     // Common method
     private List<MediaMessageResponse> getMessagesByTypes(String conversationId, String senderId, List<MessageType> types) {
         Criteria criteria = Criteria.where("conversationId").is(new ObjectId(conversationId))
@@ -294,6 +273,26 @@ public class MessageServiceImpl implements MessageService {
                         .createdAt(msg.getCreatedAt())
                         .build())
                 .toList();
+    }
+
+    @Override
+    public void addReplyToMessage(String messageId, MessageDTO messageDTO) {
+        // Check message exists
+        Message parrentMessage = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(parrentMessage.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check if user exist in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        // Create replyStatus
+
+//        messageDTO.set
     }
 
     private User getCurrentUser() {

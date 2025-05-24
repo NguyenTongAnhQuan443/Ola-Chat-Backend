@@ -63,5 +63,15 @@ public class MessageController {
                 .build();
     }
 
+    @PostMapping("/{messageId}/replies")
+    public MessageResponse<String> addReplyToMessage(@PathVariable String messageId,
+                                                     @RequestBody MessageDTO messageDTO) {
+        messageService.addReplyToMessage(messageId, messageDTO);
+        return MessageResponse.<String>builder()
+                .message("Trả lời tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
+
 
 }

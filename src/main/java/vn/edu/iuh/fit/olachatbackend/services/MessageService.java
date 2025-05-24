@@ -28,4 +28,5 @@ public interface MessageService {
     void markMessageAsReceived(String messageId);
 
     void hiddenForUser(String messageId);
+    void addReplyToMessage(String messageId, MessageDTO messageDTO);
 }
