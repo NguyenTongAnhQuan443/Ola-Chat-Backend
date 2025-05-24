@@ -56,7 +56,7 @@ public class MessageServiceImpl implements MessageService {
                 .conversationId(new ObjectId(messageDTO.getConversationId()))
                 .content(messageDTO.getContent())
                 .type(messageDTO.getType())
-                .mediaUrls(messageDTO.getMediaUrls())
+                .mediaUrls(messageDTO.getMediaUrls() == null ? new ArrayList<>() : messageDTO.getMediaUrls())
                 .status(MessageStatus.SENT)
                 .deliveryStatus(messageDTO.getDeliveryStatus() == null ? new ArrayList<>() : messageDTO.getDeliveryStatus())
                 .readStatus(messageDTO.getReadStatus() == null ? new ArrayList<>() : messageDTO.getReadStatus())
@@ -64,6 +64,7 @@ public class MessageServiceImpl implements MessageService {
                 .deletedStatus(messageDTO.getDeletedStatus() == null ? new ArrayList<>() : messageDTO.getDeletedStatus())
                 .createdAt(LocalDateTime.now())
                 .recalled(messageDTO.isRecalled())
+                .mentions(messageDTO.getMentions() == null ? new ArrayList<>() : messageDTO.getMentions())
                 .build();
         Message savedMessage = messageRepository.save(message);
 
@@ -95,7 +96,7 @@ public class MessageServiceImpl implements MessageService {
                             .conversationId(message.getConversationId().toHexString())
                             .content(message.getContent())
                             .type(message.getType())
-                            .mediaUrls(message.getMediaUrls())
+                            .mediaUrls(message.getMediaUrls() == null ? new ArrayList<>() : message.getMediaUrls())
                             .status(message.getStatus())
                             .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
                             .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
@@ -103,6 +104,7 @@ public class MessageServiceImpl implements MessageService {
                             .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
                             .createdAt(message.getCreatedAt())
                             .recalled(message.isRecalled())
+                            .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
                             .build();
                 })
                 .toList();
@@ -231,7 +233,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void markMessageAsRead(String messageId, String userId) {
+    public void markMessageAsRead(String messageId) {
+        User currentUser = getCurrentUser();
         Message message = messageRepository.findById(new ObjectId(messageId))
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy message"));
 
@@ -239,11 +242,11 @@ public class MessageServiceImpl implements MessageService {
             message.setReadStatus(new ArrayList<>());
         }
 
-        if (message.getReadStatus().stream().anyMatch(rs -> rs.getUserId().equals(userId))) {
+        if (message.getReadStatus().stream().anyMatch(rs -> rs.getUserId().equals(currentUser.getId()))) {
             return;
         }
 
-        message.getReadStatus().add(new ReadStatus(userId, LocalDateTime.now()));
+        message.getReadStatus().add(new ReadStatus(currentUser.getId(), LocalDateTime.now()));
 
         Conversation conversation = conversationRepository.findById(message.getConversationId())
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));

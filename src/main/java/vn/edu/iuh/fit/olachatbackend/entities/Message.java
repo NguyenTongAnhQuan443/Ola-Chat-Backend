@@ -36,6 +36,7 @@ public class Message {
     private List<ReplyStatus> replyStatus;
     private List<DeletedStatus> deletedStatus;
     private boolean recalled = false;
+    private List<Mention> mentions;
 
     @Data
     @Builder

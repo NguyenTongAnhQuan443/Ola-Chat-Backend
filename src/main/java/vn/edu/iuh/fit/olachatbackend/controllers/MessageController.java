@@ -45,10 +45,9 @@ public class MessageController {
 
     @PutMapping("/{messageId}/read")
     public MessageResponse<String> markAsRead(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        messageService.markMessageAsRead(messageId, userId);
+        messageService.markMessageAsRead(messageId);
         return MessageResponse.<String>builder()
                 .message("Đánh dấu đã đọc thành công.")
                 .data("OK")

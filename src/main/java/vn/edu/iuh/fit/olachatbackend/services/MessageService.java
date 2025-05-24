@@ -24,7 +24,7 @@ public interface MessageService {
     List<MediaMessageResponse> getMediaMessages(String conversationId, String senderId);
     List<MediaMessageResponse> getFileMessages(String conversationId, String senderId);
 
-    void markMessageAsRead(String messageId, String userId);
+    void markMessageAsRead(String messageId);
     void markMessageAsReceived(String messageId);
 
     void hiddenForUser(String messageId);
