@@ -13,8 +13,10 @@ package vn.edu.iuh.fit.olachatbackend.dtos;
  */
 
 import lombok.*;
+import org.bson.types.ObjectId;
 import vn.edu.iuh.fit.olachatbackend.entities.DeliveryStatus;
 import vn.edu.iuh.fit.olachatbackend.entities.Mention;
+import vn.edu.iuh.fit.olachatbackend.entities.Message;
 import vn.edu.iuh.fit.olachatbackend.entities.ReadStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
@@ -36,7 +38,9 @@ public class MessageDTO {
     private MessageStatus status;
     private List<DeliveryStatus> deliveryStatus;
     private List<ReadStatus> readStatus;
+    private List<Message.DeletedStatus> deletedStatus;
     private LocalDateTime createdAt;
     private boolean recalled;
     private List<Mention> mentions;
+    private String replyTo;
 }

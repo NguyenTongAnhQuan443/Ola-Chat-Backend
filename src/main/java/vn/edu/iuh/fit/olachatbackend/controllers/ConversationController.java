@@ -50,8 +50,11 @@ public class ConversationController {
     }
 
     @GetMapping(value = "/{id}/messages", produces = "application/json;charset=UTF-8")
-    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id) {
-        List<MessageDTO> messages = messageService.getMessagesByConversationId(id);
+    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id,
+                                                                        @RequestParam(defaultValue = "0") int page,
+                                                                        @RequestParam(defaultValue = "20") int size,
+                                                                        @RequestParam(defaultValue = "desc") String sortDirection) {
+        List<MessageDTO> messages = messageService.getMessagesByConversationId(id, page, size, sortDirection);
         return ResponseEntity.ok(messages);
     }
 
