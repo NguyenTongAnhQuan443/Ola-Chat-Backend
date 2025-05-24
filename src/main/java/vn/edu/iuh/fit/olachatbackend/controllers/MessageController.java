@@ -33,10 +33,9 @@ public class MessageController {
 
     @PutMapping("/{messageId}/received")
     public MessageResponse<String> markAsReceived(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        messageService.markMessageAsReceived(messageId, userId);
+        messageService.markMessageAsReceived(messageId);
         return MessageResponse.<String>builder()
                 .message("Đã đánh dấu tin nhắn là đã nhận.")
                 .data(messageId)
@@ -46,17 +45,33 @@ public class MessageController {
 
     @PutMapping("/{messageId}/read")
     public MessageResponse<String> markAsRead(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        messageService.markMessageAsRead(messageId, userId);
+        messageService.markMessageAsRead(messageId);
         return MessageResponse.<String>builder()
                 .message("Đánh dấu đã đọc thành công.")
                 .data("OK")
                 .build();
     }
 
+    @PostMapping("/{messageId}/hiddenForUser")
+    public MessageResponse<String> hiddenForUser(@PathVariable String messageId) {
+        messageService.hiddenForUser(messageId);
+        return MessageResponse.<String>builder()
+                .message("Xóa tin nhắn ở phía bạn thành công.")
+                .data(null)
+                .build();
+    }
 
+    @PostMapping("/{messageId}/replies")
+    public MessageResponse<String> addReplyToMessage(@PathVariable String messageId,
+                                                     @RequestBody MessageDTO messageDTO) {
+        messageService.addReplyToMessage(messageId, messageDTO);
+        return MessageResponse.<String>builder()
+                .message("Trả lời tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
 
 
 }

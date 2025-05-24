@@ -13,6 +13,7 @@ package vn.edu.iuh.fit.olachatbackend.repositories;
  */
 
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 import vn.edu.iuh.fit.olachatbackend.entities.Message;
@@ -21,6 +22,6 @@ import java.util.List;
 
 @Repository
 public interface MessageRepository extends MongoRepository<Message, ObjectId> {
-    List<Message> findByConversationId(ObjectId conversationId);
+    List<Message> findByConversationId(ObjectId conversationId, Pageable pageable);
     Message findTopByConversationIdOrderByCreatedAtDesc(ObjectId conversationId);
 }
