@@ -13,6 +13,9 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  */
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
@@ -71,8 +74,14 @@ public class MessageServiceImpl implements MessageService {
         return messageDTO;
     }
 
-    public List<MessageDTO> getMessagesByConversationId(String conversationId) {
-        List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId));
+    public List<MessageDTO> getMessagesByConversationId(String conversationId, int page, int size, String sortDirection) {
+        // Create sort direction
+        Sort.Direction direction = sortDirection.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+        // Create pageable
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, "createdAt"));
+
+        List<Message> messages = messageRepository.findByConversationId(new ObjectId(conversationId), pageable);
 
         return messages.stream()
                 .map(message -> {

@@ -18,7 +18,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 import java.util.List;
 
 public interface MessageService {
-    List<MessageDTO> getMessagesByConversationId(String conversationId);
+    List<MessageDTO> getMessagesByConversationId(String conversationId, int page, int size, String sortDirection);
     MessageDTO save(MessageDTO messageDTO);
     MessageDTO recallMessage(String messageId, String senderId);
     List<MediaMessageResponse> getMediaMessages(String conversationId, String senderId);
