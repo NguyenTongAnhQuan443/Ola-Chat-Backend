@@ -290,9 +290,11 @@ public class MessageServiceImpl implements MessageService {
         // Check if user exist in conversation
         checkUserExistsInConversation(conversation.getId(), currentUser.getId());
 
-        // Create replyStatus
+        // set reply to message
+        messageDTO.setReplyTo(messageId);
 
-//        messageDTO.set
+        // save message
+        save(messageDTO);
     }
 
     private User getCurrentUser() {
