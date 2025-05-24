@@ -171,7 +171,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void markMessageAsReceived(String messageId, String userId) {
+    public void markMessageAsReceived(String messageId) {
+        User currentUser = getCurrentUser();
         Message message = messageRepository.findById(new ObjectId(messageId))
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
         Conversation conversation = conversationRepository.findById(message.getConversationId())
@@ -183,9 +184,9 @@ public class MessageServiceImpl implements MessageService {
 
         // Thêm người nhận vào deliveryStatus nếu chưa có
         if (message.getDeliveryStatus().stream()
-                .noneMatch(ds -> ds.getUserId().equals(userId))) {
+                .noneMatch(ds -> ds.getUserId().equals(currentUser.getId()))) {
             message.getDeliveryStatus().add(DeliveryStatus.builder()
-                    .userId(userId)
+                    .userId(currentUser.getId())
                     .deliveredAt(LocalDateTime.now())
                     .build());
         }

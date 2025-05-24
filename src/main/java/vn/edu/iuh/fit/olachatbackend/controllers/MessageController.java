@@ -33,10 +33,9 @@ public class MessageController {
 
     @PutMapping("/{messageId}/received")
     public MessageResponse<String> markAsReceived(
-            @PathVariable String messageId,
-            @RequestParam String userId
+            @PathVariable String messageId
     ) {
-        messageService.markMessageAsReceived(messageId, userId);
+        messageService.markMessageAsReceived(messageId);
         return MessageResponse.<String>builder()
                 .message("Đã đánh dấu tin nhắn là đã nhận.")
                 .data(messageId)
