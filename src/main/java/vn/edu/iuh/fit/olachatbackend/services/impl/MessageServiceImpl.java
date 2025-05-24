@@ -13,6 +13,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  */
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
@@ -21,6 +22,7 @@ import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
+import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
 import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
@@ -33,7 +35,6 @@ import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -57,8 +58,10 @@ public class MessageServiceImpl implements MessageService {
                 .type(messageDTO.getType())
                 .mediaUrls(messageDTO.getMediaUrls())
                 .status(MessageStatus.SENT)
-                .deliveryStatus(messageDTO.getDeliveryStatus())
-                .readStatus(messageDTO.getReadStatus())
+                .deliveryStatus(messageDTO.getDeliveryStatus() == null ? new ArrayList<>() : messageDTO.getDeliveryStatus())
+                .readStatus(messageDTO.getReadStatus() == null ? new ArrayList<>() : messageDTO.getReadStatus())
+                .replyStatus(messageDTO.getReplyStatus() == null ? new ArrayList<>() : messageDTO.getReplyStatus())
+                .deletedStatus(messageDTO.getDeletedStatus() == null ? new ArrayList<>() : messageDTO.getDeletedStatus())
                 .createdAt(LocalDateTime.now())
                 .recalled(messageDTO.isRecalled())
                 .build();
@@ -94,8 +97,10 @@ public class MessageServiceImpl implements MessageService {
                             .type(message.getType())
                             .mediaUrls(message.getMediaUrls())
                             .status(message.getStatus())
-                            .deliveryStatus(message.getDeliveryStatus())
-                            .readStatus(message.getReadStatus())
+                            .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
+                            .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
+                            .replyStatus(message.getReplyStatus() == null ? new ArrayList<>() : message.getReplyStatus())
+                            .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
                             .createdAt(message.getCreatedAt())
                             .recalled(message.isRecalled())
                             .build();
@@ -194,6 +199,37 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    public void hiddenForUser(String messageId) {
+        // Check message exists
+        Message message = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check if user exist in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        // hidden message
+        Message.DeletedStatus deletedStatus = Message.DeletedStatus.builder()
+                .userId(currentUser.getId())
+                .deletedAt(LocalDateTime.now())
+                .build();
+
+        if (message.getDeletedStatus() == null) {
+            message.setDeletedStatus(new ArrayList<>());
+        }
+
+        message.getDeletedStatus().add(deletedStatus);
+
+        // save to database
+        messageRepository.save(message);
+    }
+
+    @Override
     public void markMessageAsRead(String messageId, String userId) {
         Message message = messageRepository.findById(new ObjectId(messageId))
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy message"));
@@ -256,6 +292,25 @@ public class MessageServiceImpl implements MessageService {
                 .toList();
     }
 
+    private User getCurrentUser() {
+        // Check user
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
 
+        return userRepository.findByUsername(name)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng này"));
+    }
+
+    /**
+     * Check if user exists in conversation or throw exception if not found
+     * @param conversationId ID of the group
+     * @param userId ID of the user
+     * @throws BadRequestException if user is not in the group
+     */
+    private void checkUserExistsInConversation(ObjectId conversationId, String userId) {
+        if (!participantRepository.existsByConversationIdAndUserId(conversationId, userId)) {
+            throw new BadRequestException("Bạn không thuộc nhóm này.");
+        }
+    }
 
 }

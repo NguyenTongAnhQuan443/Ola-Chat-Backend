@@ -37,18 +37,21 @@ public class Message {
     private List<DeletedStatus> deletedStatus;
     private boolean recalled = false;
 
+    @Data
+    @Builder
+    public static class ReplyStatus {
+        private String userId;
+        private LocalDateTime repliedAt;
+        private String replyMessageId;
+    }
+
+    @Data
+    @Builder
+    public static class DeletedStatus {
+        private String userId;
+        private LocalDateTime deletedAt;
+    }
 }
 
-@Data
-class ReplyStatus {
-    private String userId;
-    private LocalDateTime repliedAt;
-    private String replyMessageId;
-}
 
-@Data
-class DeletedStatus {
-    private String userId;
-    private LocalDateTime deletedAt;
-}
 

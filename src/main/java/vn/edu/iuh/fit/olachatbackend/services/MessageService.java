@@ -26,4 +26,6 @@ public interface MessageService {
 
     void markMessageAsRead(String messageId, String userId);
     void markMessageAsReceived(String messageId, String userId);
+
+    void hiddenForUser(String messageId);
 }

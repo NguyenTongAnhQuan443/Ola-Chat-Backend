@@ -56,7 +56,14 @@ public class MessageController {
                 .build();
     }
 
-
+    @PostMapping("/{messageId}/hiddenForUser")
+    public MessageResponse<String> hiddenForUser(@PathVariable String messageId) {
+        messageService.hiddenForUser(messageId);
+        return MessageResponse.<String>builder()
+                .message("Xóa tin nhắn ở phía bạn thành công.")
+                .data(null)
+                .build();
+    }
 
 
 }
