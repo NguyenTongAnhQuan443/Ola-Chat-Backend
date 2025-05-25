@@ -93,5 +93,15 @@ public class MessageController {
                 .build();
     }
 
+    @DeleteMapping("/{messageId}/reactions")
+    public MessageResponse<String> removeReactionToMessage(@PathVariable String messageId) {
+        messageService.removeReactionToMessage(messageId);
+        return MessageResponse.<String>builder()
+                .message("Xoá reaction tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
+
+
 
 }

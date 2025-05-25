@@ -350,7 +350,7 @@ public class MessageServiceImpl implements MessageService {
 
         // Check system message
         if (message.getType().equals(MessageType.SYSTEM)) {
-            throw new BadRequestException("Bạn không thể react tin nhắn hệ thóng!");
+            throw new BadRequestException("Bạn không thể react tin nhắn hệ thống!");
         }
 
         // Check Sticker message
@@ -386,6 +386,46 @@ public class MessageServiceImpl implements MessageService {
 
         // Save message
         messageRepository.save(message);
+    }
+
+    @Override
+    public void removeReactionToMessage(String messageId) {
+        // Check message exists
+        Message message = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check user exists in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        // Check system message
+        if (message.getType().equals(MessageType.SYSTEM)) {
+            throw new BadRequestException("Bạn không thể xóa react tin nhắn hệ thống!");
+        }
+
+        // Check Sticker message
+        if (message.getType().equals(MessageType.STICKER)) {
+            throw new BadRequestException("Bạn không thể xóa react Sticker!");
+        }
+
+        // Remove the reaction of current user if exists
+        List<Message.Reaction> reactions = message.getReactions();
+        if (reactions != null) {
+            boolean removed = reactions.removeIf(r -> r.getUserId().equals(currentUser.getId()));
+            if (removed) {
+                message.setReactions(reactions);
+                messageRepository.save(message);
+            } else {
+                throw new BadRequestException("Người dùng chưa thả reaction nào vào tin nhắn này");
+            }
+        } else {
+            throw new BadRequestException("Tin nhắn này chưa có reaction nào");
+        }
     }
 
     @Override

@@ -32,5 +32,8 @@ public interface MessageService {
     void addReplyToMessage(String messageId, MessageDTO messageDTO);
 
     void addReactionToMessage(String messageId, String emoji);
+    void removeReactionToMessage(String messageId);
+
     MessageDetailDTO getMessageDetail(String messageId);
+
 }
