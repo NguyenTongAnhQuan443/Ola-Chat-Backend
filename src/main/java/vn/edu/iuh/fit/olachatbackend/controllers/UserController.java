@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangePasswordRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetNickNameRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.FriendResponse;
 import jakarta.validation.Valid;
@@ -139,7 +140,14 @@ public class UserController {
                 .build();
     }
 
-
+    @PostMapping("/set-nickname")
+    public MessageResponse<Void> setNickname(@RequestBody SetNickNameRequest request) {
+        userService.setNickname(request);
+        return MessageResponse.<Void>builder()
+                .message("Thêm biệt danh thành công.")
+                .data(null)
+                .build();
+    }
 
 
 }

@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetNickNameRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.IntrospectResponse;
@@ -28,6 +29,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserSearchResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.FriendRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.entities.UserNickname;
 import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
@@ -35,10 +37,7 @@ import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRequestRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.LoginHistoryRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.*;
 import vn.edu.iuh.fit.olachatbackend.utils.OtpUtils;
 
@@ -63,6 +62,7 @@ public class UserServiceImpl implements UserService {
     private final ParticipantMapper participantMapper;
     private final LoginHistoryRepository loginHistoryRepository;
     private final FriendRequestRepository friendRequestRepository;
+    private final UserNicknameRepository userNicknameRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -359,6 +359,28 @@ public class UserServiceImpl implements UserService {
         redisService.deleteEmailUpdateOtp(userId);
 
         return userMapper.toUserResponse(savedUser);
+    }
+
+    @Override
+    public void setNickname(SetNickNameRequest request) {
+        // Check ì user exists
+        User owner = getCurrentUser();
+        User target = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng cần đặt biệt danh."));
+
+        // Set nickname
+        UserNickname userNickname = userNicknameRepository.findByOwnerIdAndTargetId(owner.getId(), target.getId())
+                .map(existing -> {
+                    existing.setNickname(request.getNickName());
+                    return existing;
+                })
+                .orElse(UserNickname.builder()
+                        .owner(owner)
+                        .target(target)
+                        .nickname(request.getNickName())
+                        .build());
+
+        userNicknameRepository.save(userNickname);
     }
 
     private User getCurrentUser() {
