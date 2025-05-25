@@ -457,29 +457,39 @@ public class MessageServiceImpl implements MessageService {
         // Check if message have reactions
         List<Message.Reaction> reactions = message.getReactions();
         if (reactions == null || reactions.isEmpty()) {
-            return new ReactionInfoDTO(0, List.of(), List.of(), List.of());
+            return ReactionInfoDTO.builder()
+                    .totalReactions(0)
+                    .userReactions(List.of())
+                    .emojiCounts(List.of())
+                    .detailedReactions(Map.of())
+                    .build();
         }
 
-        // Calculate total reactions
-        int totalReactions = reactions.stream().mapToInt(r -> r.getCount() == null ? 0 : r.getCount()).sum();
-
-        // Create detail info
-        Map<String, Integer> userReactionMap = new HashMap<>();
+        int totalReactions = 0;
+        Map<String, Integer> userTotalMap = new HashMap<>();
+        Map<String, Set<String>> userEmojiMap = new HashMap<>();
         Map<String, Integer> emojiCountMap = new HashMap<>();
-        List<ReactionInfoDTO.DetailedReaction> detailed = new ArrayList<>();
+        Map<String, List<ReactionInfoDTO.DetailedReaction>> detailedMap = new HashMap<>();
 
         for (Message.Reaction r : reactions) {
             int count = r.getCount() == null ? 0 : r.getCount();
+            totalReactions += count;
 
-            detailed.add(new ReactionInfoDTO.DetailedReaction(r.getUserId(), r.getEmoji(), count));
+            userTotalMap.merge(r.getUserId(), count, Integer::sum);
+            userEmojiMap.computeIfAbsent(r.getUserId(), k -> new HashSet<>()).add(r.getEmoji());
 
-            userReactionMap.merge(r.getUserId(), count, Integer::sum);
             emojiCountMap.merge(r.getEmoji(), count, Integer::sum);
+
+            detailedMap.computeIfAbsent(r.getEmoji(), k -> new ArrayList<>())
+                    .add(new ReactionInfoDTO.DetailedReaction(r.getUserId(), r.getEmoji(), count));
         }
 
-        List<ReactionInfoDTO.UserReactionSummary> userSummary = userReactionMap.entrySet().stream()
-                .map(e -> new ReactionInfoDTO.UserReactionSummary(e.getKey(), e.getValue()))
-                .toList();
+        List<ReactionInfoDTO.UserReactionSummary> userSummary = userTotalMap.entrySet().stream()
+                .map(e -> new ReactionInfoDTO.UserReactionSummary(
+                        e.getKey(),
+                        e.getValue(),
+                        new ArrayList<>(userEmojiMap.getOrDefault(e.getKey(), Set.of()))
+                )).toList();
 
         List<ReactionInfoDTO.EmojiReactionSummary> emojiSummary = emojiCountMap.entrySet().stream()
                 .map(e -> new ReactionInfoDTO.EmojiReactionSummary(e.getKey(), e.getValue()))
@@ -489,7 +499,7 @@ public class MessageServiceImpl implements MessageService {
                 .totalReactions(totalReactions)
                 .userReactions(userSummary)
                 .emojiCounts(emojiSummary)
-                .detailedReactions(detailed)
+                .detailedReactions(detailedMap)
                 .build();
     }
 

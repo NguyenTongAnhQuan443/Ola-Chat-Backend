@@ -15,6 +15,7 @@ package vn.edu.iuh.fit.olachatbackend.dtos;
 import lombok.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @AllArgsConstructor
@@ -25,7 +26,7 @@ public class ReactionInfoDTO {
 
     private List<UserReactionSummary> userReactions;
     private List<EmojiReactionSummary> emojiCounts;
-    private List<DetailedReaction> detailedReactions;
+    private Map<String, List<DetailedReaction>> detailedReactions;
 
     @Data
     @AllArgsConstructor
@@ -33,6 +34,7 @@ public class ReactionInfoDTO {
     public static class UserReactionSummary {
         private String userId;
         private int totalCount;
+        private List<String> emojiTypes;
     }
 
     @Data
