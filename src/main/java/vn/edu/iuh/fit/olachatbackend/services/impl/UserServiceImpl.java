@@ -19,7 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetNickNameRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetContactAliasRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.IntrospectResponse;
@@ -29,7 +29,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserSearchResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.FriendRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
-import vn.edu.iuh.fit.olachatbackend.entities.UserNickname;
+import vn.edu.iuh.fit.olachatbackend.entities.ContactAlias;
 import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
@@ -62,7 +62,7 @@ public class UserServiceImpl implements UserService {
     private final ParticipantMapper participantMapper;
     private final LoginHistoryRepository loginHistoryRepository;
     private final FriendRequestRepository friendRequestRepository;
-    private final UserNicknameRepository userNicknameRepository;
+    private final ContactAliasRepository userNicknameRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -362,22 +362,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void setNickname(SetNickNameRequest request) {
+    public void setContactAlias(SetContactAliasRequest request) {
         // Check ì user exists
         User owner = getCurrentUser();
         User target = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng cần đặt biệt danh."));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng cần đặt tên gợi nhớ."));
 
         // Set nickname
-        UserNickname userNickname = userNicknameRepository.findByOwnerIdAndTargetId(owner.getId(), target.getId())
+        ContactAlias userNickname = userNicknameRepository.findByOwnerIdAndTargetId(owner.getId(), target.getId())
                 .map(existing -> {
-                    existing.setNickname(request.getNickName());
+                    existing.setAliasName(request.getContactAlias());
                     return existing;
                 })
-                .orElse(UserNickname.builder()
+                .orElse(ContactAlias.builder()
                         .owner(owner)
                         .target(target)
-                        .nickname(request.getNickName())
+                        .aliasName(request.getContactAlias())
                         .build());
 
         userNicknameRepository.save(userNickname);

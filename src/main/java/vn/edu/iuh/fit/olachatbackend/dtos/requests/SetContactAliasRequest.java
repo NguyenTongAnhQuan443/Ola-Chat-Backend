@@ -17,7 +17,7 @@ import lombok.Data;
 
 @Builder
 @Data
-public class SetNickNameRequest {
+public class SetContactAliasRequest {
     private String userId;
-    private String nickName;
+    private String contactAlias;
 }

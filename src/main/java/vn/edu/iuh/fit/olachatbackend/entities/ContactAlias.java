@@ -21,9 +21,8 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "user_nicknames",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"owner_id", "target_id"}))
-public class UserNickname {
+@Table(name = "contact_aliases")
+public class ContactAlias {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -41,5 +40,5 @@ public class UserNickname {
 
     // The personal nickname that the owner gives to the target
     @Column(nullable = false)
-    private String nickname;
+    private String aliasName;
 }

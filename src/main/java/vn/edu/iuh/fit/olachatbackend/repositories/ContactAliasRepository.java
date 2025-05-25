@@ -13,11 +13,11 @@ package vn.edu.iuh.fit.olachatbackend.repositories;
  */
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import vn.edu.iuh.fit.olachatbackend.entities.UserNickname;
+import vn.edu.iuh.fit.olachatbackend.entities.ContactAlias;
 
 import java.util.Optional;
 
-public interface UserNicknameRepository extends JpaRepository<UserNickname, String> {
-    Optional<UserNickname> findByOwnerIdAndTargetId(String ownerId, String targetId);
+public interface ContactAliasRepository extends JpaRepository<ContactAlias, String> {
+    Optional<ContactAlias> findByOwnerIdAndTargetId(String ownerId, String targetId);
 }
 
