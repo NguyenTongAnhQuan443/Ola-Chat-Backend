@@ -63,6 +63,7 @@ public class UserServiceImpl implements UserService {
     private final LoginHistoryRepository loginHistoryRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final ContactAliasRepository userNicknameRepository;
+    private final ContactAliasRepository contactAliasRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -124,6 +125,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<ParticipantResponse> getUsersByConversationId(String conversationId) {
+        User currentUser = getCurrentUser();
+
         List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
         List<String> userIds = participants.stream()
@@ -140,7 +143,8 @@ public class UserServiceImpl implements UserService {
         return parts.stream().map(p -> {
             ParticipantResponse pResponse = participantMapper.toParticipantResponse(p);
             User info = userRepository.findById(p.getUserId()).get();
-            pResponse.setDisplayName(info.getDisplayName());
+            // Set contact alias name
+            pResponse.setDisplayName(getAliasNameOrDefault(currentUser.getId(), info));
             pResponse.setAvatar(info.getAvatar());
             boolean status = loginHistoryRepository
                     .findTopByUserIdAndStatusOrderByLoginTimeDesc(p.getUserId(), LoginHistoryStatus.ONLINE)
@@ -371,16 +375,22 @@ public class UserServiceImpl implements UserService {
         // Set nickname
         ContactAlias userNickname = userNicknameRepository.findByOwnerIdAndTargetId(owner.getId(), target.getId())
                 .map(existing -> {
-                    existing.setAliasName(request.getContactAlias());
+                    existing.setAliasName(request.getAliasName());
                     return existing;
                 })
                 .orElse(ContactAlias.builder()
                         .owner(owner)
                         .target(target)
-                        .aliasName(request.getContactAlias())
+                        .aliasName(request.getAliasName())
                         .build());
 
         userNicknameRepository.save(userNickname);
+    }
+
+    public String getAliasNameOrDefault(String ownerId, User target) {
+        return contactAliasRepository.findByOwnerIdAndTargetId(ownerId, target.getId())
+                .map(ContactAlias::getAliasName)
+                .orElse(target.getDisplayName());
     }
 
     private User getCurrentUser() {

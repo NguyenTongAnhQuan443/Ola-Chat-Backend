@@ -142,7 +142,7 @@ public class UserController {
     public MessageResponse<Void> setNickname(@RequestBody SetContactAliasRequest request) {
         userService.setContactAlias(request);
         return MessageResponse.<Void>builder()
-                .message("Thêm biệt danh thành công.")
+                .message("Đặt tên gợi nhớ thành công.")
                 .data(null)
                 .build();
     }

@@ -19,5 +19,5 @@ import lombok.Data;
 @Data
 public class SetContactAliasRequest {
     private String userId;
-    private String contactAlias;
+    private String aliasName;
 }
