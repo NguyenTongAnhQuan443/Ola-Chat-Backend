@@ -19,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
@@ -347,6 +348,16 @@ public class MessageServiceImpl implements MessageService {
         // Check user exists in conversation
         checkUserExistsInConversation(conversation.getId(), currentUser.getId());
 
+        // Check system message
+        if (message.getType().equals(MessageType.SYSTEM)) {
+            throw new BadRequestException("Bạn không thể react tin nhắn hệ thóng!");
+        }
+
+        // Check Sticker message
+        if (message.getType().equals(MessageType.STICKER)) {
+            throw new BadRequestException("Bạn không thể react Sticker!");
+        }
+
         List<Message.Reaction> reactions = message.getReactions();
         if (reactions == null) {
             reactions = new ArrayList<>();
@@ -375,6 +386,39 @@ public class MessageServiceImpl implements MessageService {
 
         // Save message
         messageRepository.save(message);
+    }
+
+    @Override
+    public MessageDetailDTO getMessageDetail(String messageId) {
+        // Check message exists
+        Message message = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check user exists in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        return MessageDetailDTO.builder()
+                .id(message.getId().toHexString())
+                .senderId(message.getSenderId())
+                .conversationId(message.getConversationId().toHexString())
+                .content(message.getContent())
+                .type(message.getType())
+                .mediaUrls(message.getMediaUrls() == null ? new ArrayList<>() : message.getMediaUrls())
+                .status(message.getStatus())
+                .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
+                .createdAt(message.getCreatedAt())
+                .recalled(message.isRecalled())
+                .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
+                .replyTo(message.getReplyTo() == null ? null : message.getReplyTo().toString())
+                .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
+                .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
+                .build();
     }
 
     private User getCurrentUser() {
