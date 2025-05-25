@@ -55,6 +55,7 @@ public class Message {
         private Integer count;
         private LocalDateTime reactedAt;
     }
+
 }
 
 
