@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
@@ -426,6 +427,70 @@ public class MessageServiceImpl implements MessageService {
         } else {
             throw new BadRequestException("Tin nhắn này chưa có reaction nào");
         }
+    }
+
+    @Override
+    public ReactionInfoDTO getReactionInfoByMessageId(String messageId) {
+        // Check message exists
+        Message message = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check user exists in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        // Check system message
+        if (message.getType().equals(MessageType.SYSTEM)) {
+            throw new BadRequestException("Bạn không thể xem react tin nhắn hệ thống!");
+        }
+
+        // Check Sticker message
+        if (message.getType().equals(MessageType.STICKER)) {
+            throw new BadRequestException("Bạn không thể xem react Sticker!");
+        }
+
+        // Check if message have reactions
+        List<Message.Reaction> reactions = message.getReactions();
+        if (reactions == null || reactions.isEmpty()) {
+            return new ReactionInfoDTO(0, List.of(), List.of(), List.of());
+        }
+
+        // Calculate total reactions
+        int totalReactions = reactions.stream().mapToInt(r -> r.getCount() == null ? 0 : r.getCount()).sum();
+
+        // Create detail info
+        Map<String, Integer> userReactionMap = new HashMap<>();
+        Map<String, Integer> emojiCountMap = new HashMap<>();
+        List<ReactionInfoDTO.DetailedReaction> detailed = new ArrayList<>();
+
+        for (Message.Reaction r : reactions) {
+            int count = r.getCount() == null ? 0 : r.getCount();
+
+            detailed.add(new ReactionInfoDTO.DetailedReaction(r.getUserId(), r.getEmoji(), count));
+
+            userReactionMap.merge(r.getUserId(), count, Integer::sum);
+            emojiCountMap.merge(r.getEmoji(), count, Integer::sum);
+        }
+
+        List<ReactionInfoDTO.UserReactionSummary> userSummary = userReactionMap.entrySet().stream()
+                .map(e -> new ReactionInfoDTO.UserReactionSummary(e.getKey(), e.getValue()))
+                .toList();
+
+        List<ReactionInfoDTO.EmojiReactionSummary> emojiSummary = emojiCountMap.entrySet().stream()
+                .map(e -> new ReactionInfoDTO.EmojiReactionSummary(e.getKey(), e.getValue()))
+                .toList();
+
+        return ReactionInfoDTO.builder()
+                .totalReactions(totalReactions)
+                .userReactions(userSummary)
+                .emojiCounts(emojiSummary)
+                .detailedReactions(detailed)
+                .build();
     }
 
     @Override

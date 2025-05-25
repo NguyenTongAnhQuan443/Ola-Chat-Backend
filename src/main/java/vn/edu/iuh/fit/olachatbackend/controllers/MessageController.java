@@ -15,6 +15,7 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
@@ -102,6 +103,14 @@ public class MessageController {
                 .build();
     }
 
+    @GetMapping("/{messageId}/reactions")
+    public MessageResponse<ReactionInfoDTO> getReactionInfo(@PathVariable String messageId) {
+        ReactionInfoDTO ReactionInfoDTO = messageService.getReactionInfoByMessageId(messageId);
+        return MessageResponse.<ReactionInfoDTO>builder()
+                .message("Lấy thông tin reaction tin nhắn thành công.")
+                .data(ReactionInfoDTO)
+                .build();
+    }
 
 
 }

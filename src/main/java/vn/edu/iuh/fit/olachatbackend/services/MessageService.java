@@ -14,6 +14,7 @@ package vn.edu.iuh.fit.olachatbackend.services;
 
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
 
 import java.util.List;
@@ -33,6 +34,7 @@ public interface MessageService {
 
     void addReactionToMessage(String messageId, String emoji);
     void removeReactionToMessage(String messageId);
+    ReactionInfoDTO getReactionInfoByMessageId(String messageId);
 
     MessageDetailDTO getMessageDetail(String messageId);
 
