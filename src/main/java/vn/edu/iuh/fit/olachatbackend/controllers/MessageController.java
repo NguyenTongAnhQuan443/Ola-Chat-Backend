@@ -73,5 +73,15 @@ public class MessageController {
                 .build();
     }
 
+    @PostMapping("/{messageId}/reactions")
+    public MessageResponse<String> addReactionToMessage(@PathVariable String messageId,
+                                                        @RequestParam String emoji) {
+        messageService.addReactionToMessage(messageId, emoji);
+        return MessageResponse.<String>builder()
+                .message("Reaction tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
+
 
 }

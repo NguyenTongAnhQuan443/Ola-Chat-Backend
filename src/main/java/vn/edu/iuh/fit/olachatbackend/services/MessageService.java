@@ -29,4 +29,6 @@ public interface MessageService {
 
     void hiddenForUser(String messageId);
     void addReplyToMessage(String messageId, MessageDTO messageDTO);
+
+    void addReactionToMessage(String messageId, String emoji);
 }

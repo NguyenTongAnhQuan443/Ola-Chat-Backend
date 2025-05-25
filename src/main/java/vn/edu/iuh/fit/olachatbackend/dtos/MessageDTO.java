@@ -43,4 +43,5 @@ public class MessageDTO {
     private boolean recalled;
     private List<Mention> mentions;
     private String replyTo;
+    private List<Message.Reaction> reactions;
 }

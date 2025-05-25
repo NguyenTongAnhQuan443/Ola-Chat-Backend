@@ -33,7 +33,6 @@ import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
-
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -67,6 +66,7 @@ public class MessageServiceImpl implements MessageService {
                 .recalled(messageDTO.isRecalled())
                 .mentions(messageDTO.getMentions() == null ? new ArrayList<>() : messageDTO.getMentions())
                 .replyTo(messageDTO.getReplyTo() == null ? null : new ObjectId(messageDTO.getReplyTo()))
+                .reactions(messageDTO.getReactions() == null ? new ArrayList<>() : messageDTO.getReactions())
                 .build();
         Message savedMessage = messageRepository.save(message);
 
@@ -100,6 +100,7 @@ public class MessageServiceImpl implements MessageService {
                             .recalled(message.isRecalled())
                             .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
                             .replyTo(message.getReplyTo() == null ? null : message.getReplyTo().toString())
+                            .reactions(message.getReactions() == null ? new ArrayList<>() : message.getReactions())
                             .build();
                 })
                 .toList();
@@ -304,6 +305,50 @@ public class MessageServiceImpl implements MessageService {
 
         // save message
         save(messageDTO);
+    }
+
+    @Override
+    public void addReactionToMessage(String messageId, String emoji) {
+        // Check message exists
+        Message message = messageRepository.findById(new ObjectId(messageId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy tin nhắn"));
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        User currentUser = getCurrentUser();
+
+        // Check user exists in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        List<Message.Reaction> reactions = message.getReactions();
+        if (reactions == null) {
+            reactions = new ArrayList<>();
+            message.setReactions(reactions);
+        }
+
+        // Find reaction of user with emoji
+        Optional<Message.Reaction> existingReactionOpt = reactions.stream()
+                .filter(r -> r.getEmoji().equals(emoji) && r.getUserId().equals(currentUser.getId()))
+                .findFirst();
+
+        if (existingReactionOpt.isPresent()) {
+            // Increase count reaction
+            Message.Reaction existingReaction = existingReactionOpt.get();
+            existingReaction.setCount(existingReaction.getCount() + 1);
+        } else {
+            // Add new reaction
+            Message.Reaction newReaction = Message.Reaction.builder()
+                    .userId(currentUser.getId())
+                    .emoji(emoji)
+                    .count(1)
+                    .build();
+            reactions.add(newReaction);
+        }
+
+        // Save message
+        messageRepository.save(message);
     }
 
     private User getCurrentUser() {
