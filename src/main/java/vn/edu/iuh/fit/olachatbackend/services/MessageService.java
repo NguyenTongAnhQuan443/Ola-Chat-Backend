@@ -17,6 +17,7 @@ import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageSearchResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +41,6 @@ public interface MessageService {
 
     MessageDetailDTO getMessageDetail(String messageId);
 
-    Page<MessageDTO> searchMessages(String conversationId, String keyword, String senderId,
-                                    LocalDateTime fromDate, LocalDateTime toDate, int page, int size);
+    Page<MessageSearchResponse> searchMessages(String conversationId, String keyword, String senderId,
+                                               LocalDateTime fromDate, LocalDateTime toDate, int page, int size);
 }

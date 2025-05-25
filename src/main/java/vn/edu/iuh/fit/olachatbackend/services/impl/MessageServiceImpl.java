@@ -13,16 +13,14 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  */
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MediaMessageResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageSearchResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
 import vn.edu.iuh.fit.olachatbackend.enums.ConversationType;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
@@ -39,6 +37,8 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -536,7 +536,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public Page<MessageDTO> searchMessages(String conversationId, String keyword, String senderId, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
+    public Page<MessageSearchResponse> searchMessages(String conversationId, String keyword, String senderId, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
         User currentUser = getCurrentUser();
 
         // Check if message in conversation
@@ -546,9 +546,35 @@ public class MessageServiceImpl implements MessageService {
         // Check user exists in conversation
         checkUserExistsInConversation(conversation.getId(), currentUser.getId());
 
-        return messageRepositoryCustomImpl.searchMessages(
+
+        Page<MessageSearchResponse> messagesPage = messageRepositoryCustomImpl.searchMessages(
                 conversationId, keyword, senderId, fromDate, toDate, page, size
         );
+
+        if (messagesPage.isEmpty()) {
+            throw new NotFoundException("Không tìm thấy tin nhắn.");
+        }
+
+        // Get all senderId in page to query User batch
+        Set<String> senderIds = messagesPage.stream()
+                .map(MessageSearchResponse::getSenderId)
+                .collect(Collectors.toSet());
+
+        Map<String, User> userMap = userRepository.findAllById(senderIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // Assign avatar for each message
+        List<MessageSearchResponse> updatedMessages = messagesPage.getContent().stream()
+                .map(message -> {
+                    User sender = userMap.get(message.getSenderId());
+                    if (sender != null) {
+                        message.setAvatar(sender.getAvatar());
+                    }
+                    return message;
+                })
+                .toList();
+
+        return new PageImpl<>(updatedMessages, messagesPage.getPageable(), messagesPage.getTotalElements());
     }
 
     private User getCurrentUser() {

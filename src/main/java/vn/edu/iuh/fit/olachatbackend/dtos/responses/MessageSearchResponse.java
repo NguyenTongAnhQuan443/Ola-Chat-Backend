@@ -12,12 +12,16 @@ package vn.edu.iuh.fit.olachatbackend.dtos.responses;
  * @version:    1.0
  */
 
+import lombok.Builder;
+import lombok.Data;
 import vn.edu.iuh.fit.olachatbackend.entities.Message;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Data
+@Builder
 public class MessageSearchResponse {
     private String id;
     private String senderId;

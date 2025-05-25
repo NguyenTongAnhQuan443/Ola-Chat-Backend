@@ -20,7 +20,10 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageSearchResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.Message;
+import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,7 +36,7 @@ public class MessageRepositoryCustomImpl {
 
     private final MongoTemplate mongoTemplate;
 
-    public Page<MessageDTO> searchMessages(
+    public Page<MessageSearchResponse> searchMessages(
             String conversationId,
             String keyword,
             String senderId,
@@ -45,6 +48,7 @@ public class MessageRepositoryCustomImpl {
         List<Criteria> criteriaList = new ArrayList<>();
 
         criteriaList.add(Criteria.where("conversationId").is(new ObjectId(conversationId)));
+        criteriaList.add(Criteria.where("type").ne(MessageType.SYSTEM));
 
         if (keyword != null && !keyword.isBlank()) {
             criteriaList.add(Criteria.where("content").regex(keyword, "i")); // ignore case
@@ -70,40 +74,21 @@ public class MessageRepositoryCustomImpl {
         query.with(pageable);
 
         List<Message> messages = mongoTemplate.find(query, Message.class);
-        List<MessageDTO> dtos = messages.stream().map(message -> {
-            List<String> emojiTypes = message.getReactions() == null
-                    ? new ArrayList<>()
-                    : message.getReactions().stream()
-                    .map(Message.Reaction::getEmoji)
-                    .distinct()
-                    .collect(Collectors.toList());
 
-            int totalReactionCount = message.getReactions() == null ? 0 : message.getReactions().size();
-
-            String lastUserReaction = message.getReactions() == null || message.getReactions().isEmpty()
-                    ? null
-                    : message.getReactions().get(message.getReactions().size() - 1).getEmoji();
-
-            return MessageDTO.builder()
-                    .id(message.getId().toHexString())
-                    .senderId(message.getSenderId())
-                    .conversationId(message.getConversationId().toHexString())
-                    .content(message.getContent())
-                    .type(message.getType())
-                    .mediaUrls(message.getMediaUrls() == null ? new ArrayList<>() : message.getMediaUrls())
-                    .status(message.getStatus())
-                    .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
-                    .createdAt(message.getCreatedAt())
-                    .recalled(message.isRecalled())
-                    .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
-                    .replyTo(message.getReplyTo() == null ? null : message.getReplyTo().toHexString())
-                    .emojiTypes(emojiTypes)
-                    .totalReactionCount(totalReactionCount)
-                    .lastUserReaction(lastUserReaction)
-                    .build();
-        }).toList();
+        List<MessageSearchResponse> dtos = messages.stream()
+                .map(message -> MessageSearchResponse.builder()
+                        .id(message.getId().toHexString())
+                        .senderId(message.getSenderId())
+                        .conversationId(message.getConversationId().toHexString())
+                        .content(message.getContent())
+                        .type(message.getType())
+                        .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
+                        .createdAt(message.getCreatedAt())
+                        .build())
+                .toList();
 
         return new PageImpl<>(dtos, pageable, total);
     }
+
 }
 

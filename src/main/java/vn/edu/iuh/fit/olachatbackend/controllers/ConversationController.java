@@ -107,7 +107,7 @@ public class ConversationController {
     }
 
     @GetMapping("/{conversationId}/search")
-    public MessageResponse<Page<MessageDTO>> searchMessages(
+    public MessageResponse<Page<MessageSearchResponse>> searchMessages(
             @PathVariable("conversationId") String conversationId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String senderId,
@@ -116,10 +116,10 @@ public class ConversationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        Page<MessageDTO> result = messageService.searchMessages(
+        Page<MessageSearchResponse> result = messageService.searchMessages(
                 conversationId, keyword, senderId, fromDate, toDate, page, size
         );
-        return MessageResponse.<Page<MessageDTO>>builder()
+        return MessageResponse.<Page<MessageSearchResponse>>builder()
                 .message("Tìm kiếm tin nhắn thành công.")
                 .data(result)
                 .build();
