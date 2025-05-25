@@ -39,7 +39,6 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,8 +59,6 @@ public class MessageServiceImpl implements MessageService {
                 .type(messageDTO.getType())
                 .mediaUrls(messageDTO.getMediaUrls() == null ? new ArrayList<>() : messageDTO.getMediaUrls())
                 .status(MessageStatus.SENT)
-                .deliveryStatus(messageDTO.getDeliveryStatus() == null ? new ArrayList<>() : messageDTO.getDeliveryStatus())
-                .readStatus(messageDTO.getReadStatus() == null ? new ArrayList<>() : messageDTO.getReadStatus())
                 .deletedStatus(messageDTO.getDeletedStatus() == null ? new ArrayList<>() : messageDTO.getDeletedStatus())
                 .createdAt(LocalDateTime.now())
                 .recalled(messageDTO.isRecalled())
@@ -91,6 +88,10 @@ public class MessageServiceImpl implements MessageService {
 
                     // Get reactions
                     List<Message.Reaction> reactions = message.getReactions();
+                    if (reactions == null) {
+                        reactions = new ArrayList<>();
+                        message.setReactions(reactions);
+                    }
 
                     // Get distinct reactions
                     List<String> emojiTypes = reactions.stream()
@@ -106,6 +107,7 @@ public class MessageServiceImpl implements MessageService {
                     // Get last reaction of user
                     String lastUserReaction = reactions.stream()
                             .filter(r -> r.getUserId().equals(currentUser.getId()))
+                            .filter(r -> r.getReactedAt() != null)
                             .max(Comparator.comparing(Message.Reaction::getReactedAt))
                             .map(Message.Reaction::getEmoji)
                             .orElse(null);
@@ -118,8 +120,6 @@ public class MessageServiceImpl implements MessageService {
                             .type(message.getType())
                             .mediaUrls(message.getMediaUrls() == null ? new ArrayList<>() : message.getMediaUrls())
                             .status(message.getStatus())
-                            .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
-                            .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
                             .deletedStatus(message.getDeletedStatus() == null ? new ArrayList<>() : message.getDeletedStatus())
                             .createdAt(message.getCreatedAt())
                             .recalled(message.isRecalled())
@@ -172,8 +172,6 @@ public class MessageServiceImpl implements MessageService {
                 .type(message.getType())
                 .mediaUrls(null)
                 .status(message.getStatus())
-                .deliveryStatus(message.getDeliveryStatus())
-                .readStatus(message.getReadStatus())
                 .recalled(true)
                 .createdAt(message.getCreatedAt())
                 .build();
