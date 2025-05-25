@@ -13,6 +13,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  */
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -28,10 +29,7 @@ import vn.edu.iuh.fit.olachatbackend.enums.MessageStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.MessageType;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
-import vn.edu.iuh.fit.olachatbackend.repositories.ConversationRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.MessageRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.ConversationService;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 
@@ -51,6 +49,7 @@ public class MessageServiceImpl implements MessageService {
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
     private final ConversationService conversationService;
+    private final MessageRepositoryCustomImpl messageRepositoryCustomImpl;
 
     @Override
     public MessageDTO save(MessageDTO messageDTO) {
@@ -534,6 +533,22 @@ public class MessageServiceImpl implements MessageService {
                 .readStatus(message.getReadStatus() == null ? new ArrayList<>() : message.getReadStatus())
                 .deliveryStatus(message.getDeliveryStatus() == null ? new ArrayList<>() : message.getDeliveryStatus())
                 .build();
+    }
+
+    @Override
+    public Page<MessageDTO> searchMessages(String conversationId, String keyword, String senderId, LocalDateTime fromDate, LocalDateTime toDate, int page, int size) {
+        User currentUser = getCurrentUser();
+
+        // Check if message in conversation
+        Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy cuộc trò chuyện"));
+
+        // Check user exists in conversation
+        checkUserExistsInConversation(conversation.getId(), currentUser.getId());
+
+        return messageRepositoryCustomImpl.searchMessages(
+                conversationId, keyword, senderId, fromDate, toDate, page, size
+        );
     }
 
     private User getCurrentUser() {
