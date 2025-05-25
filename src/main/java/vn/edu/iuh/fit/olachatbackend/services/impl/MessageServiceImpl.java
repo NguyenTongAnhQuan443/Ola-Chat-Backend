@@ -39,6 +39,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -66,7 +67,7 @@ public class MessageServiceImpl implements MessageService {
                 .recalled(messageDTO.isRecalled())
                 .mentions(messageDTO.getMentions() == null ? new ArrayList<>() : messageDTO.getMentions())
                 .replyTo(messageDTO.getReplyTo() == null ? null : new ObjectId(messageDTO.getReplyTo()))
-                .reactions(messageDTO.getReactions() == null ? new ArrayList<>() : messageDTO.getReactions())
+                .reactions(new ArrayList<>())
                 .build();
         Message savedMessage = messageRepository.save(message);
 
@@ -75,6 +76,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId, int page, int size, String sortDirection) {
+        User currentUser = getCurrentUser();
+
         // Create sort direction
         Sort.Direction direction = sortDirection.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
 
@@ -85,6 +88,28 @@ public class MessageServiceImpl implements MessageService {
 
         return messages.stream()
                 .map(message -> {
+
+                    // Get reactions
+                    List<Message.Reaction> reactions = message.getReactions();
+
+                    // Get distinct reactions
+                    List<String> emojiTypes = reactions.stream()
+                            .map(Message.Reaction::getEmoji)
+                            .distinct()
+                            .toList();
+
+                    // Get total reaction
+                    int totalReactionCount = reactions.stream()
+                            .mapToInt(Message.Reaction::getCount)
+                            .sum();
+
+                    // Get last reaction of user
+                    String lastUserReaction = reactions.stream()
+                            .filter(r -> r.getUserId().equals(currentUser.getId()))
+                            .max(Comparator.comparing(Message.Reaction::getReactedAt))
+                            .map(Message.Reaction::getEmoji)
+                            .orElse(null);
+
                     return MessageDTO.builder()
                             .id(message.getId().toHexString())
                             .senderId(message.getSenderId())
@@ -100,7 +125,9 @@ public class MessageServiceImpl implements MessageService {
                             .recalled(message.isRecalled())
                             .mentions(message.getMentions() == null ? new ArrayList<>() : message.getMentions())
                             .replyTo(message.getReplyTo() == null ? null : message.getReplyTo().toString())
-                            .reactions(message.getReactions() == null ? new ArrayList<>() : message.getReactions())
+                            .emojiTypes(emojiTypes)
+                            .totalReactionCount(totalReactionCount)
+                            .lastUserReaction(lastUserReaction)
                             .build();
                 })
                 .toList();
@@ -343,6 +370,7 @@ public class MessageServiceImpl implements MessageService {
                     .userId(currentUser.getId())
                     .emoji(emoji)
                     .count(1)
+                    .reactedAt(LocalDateTime.now())
                     .build();
             reactions.add(newReaction);
         }

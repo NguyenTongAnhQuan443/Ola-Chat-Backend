@@ -53,6 +53,7 @@ public class Message {
         private String userId;
         private String emoji;
         private Integer count;
+        private LocalDateTime reactedAt;
     }
 }
 

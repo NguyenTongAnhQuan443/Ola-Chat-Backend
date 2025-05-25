@@ -43,5 +43,8 @@ public class MessageDTO {
     private boolean recalled;
     private List<Mention> mentions;
     private String replyTo;
-    private List<Message.Reaction> reactions;
+    // emoji
+    private List<String> emojiTypes;
+    private int totalReactionCount;
+    private String lastUserReaction;
 }
