@@ -13,6 +13,7 @@ package vn.edu.iuh.fit.olachatbackend.services;
  */
 
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetContactAliasRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.ParticipantResponse;
@@ -55,4 +56,5 @@ public interface UserService {
     public void requestEmailUpdate( String newEmail);
     public UserResponse verifyAndUpdateEmail(String otpInput);
 
+    void setContactAlias(SetContactAliasRequest request);
 }
