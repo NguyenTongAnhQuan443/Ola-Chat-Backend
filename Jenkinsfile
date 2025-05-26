@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     DOCKERHUB_CREDENTIALS = credentials('dockerhub')
-    DOCKER_REPO = 'your-dockerhub-username/ola-chat-backend'
+    DOCKER_REPO = 'nguyenthanhnhut13/ola-chat-backend'
     IMAGE_TAG = 'latest'
   }
 
