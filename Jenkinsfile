@@ -18,7 +18,7 @@ pipeline {
         stage('Add Firebase Service Account') {
             steps {
                 withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
-                    sh 'copy %FIREBASE_KEY_FILE% src\\main\\resources\\serviceAccountKey.json'
+                    sh 'cp %FIREBASE_KEY_FILE% src\\main\\resources\\serviceAccountKey.json'
                 }
             }
         }
