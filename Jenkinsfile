@@ -22,7 +22,11 @@ pipeline {
         stage('Add Firebase Service Account') {
             steps {
                 withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
-                    sh 'cp "$FIREBASE_KEY_FILE" src/main/resources/serviceAccountKey.json'
+                    sh '''
+                        echo "📦 Copying Firebase service account key..."
+                        cp "$FIREBASE_KEY_FILE" src/main/resources/serviceAccountKey.json
+                        ls -l src/main/resources/serviceAccountKey.json
+                    '''
                 }
             }
         }
@@ -36,7 +40,10 @@ pipeline {
         stage('Login to DockerHub') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
-                    sh 'docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASS"'
+                    sh '''
+                        echo "🔐 Logging into DockerHub..."
+                        docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASS"
+                    '''
                 }
             }
         }
