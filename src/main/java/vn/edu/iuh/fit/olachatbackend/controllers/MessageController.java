@@ -12,10 +12,16 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
  * @version:    1.0
  */
 
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.MessageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.MessageDetailDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.ReactionInfoDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.services.MessageService;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -29,6 +35,15 @@ public class MessageController {
     @PostMapping
     public MessageDTO createMessage(@RequestBody MessageDTO messageDTO) {
         return messageService.save(messageDTO);
+    }
+
+    @GetMapping("/{messageId}")
+    public MessageResponse<MessageDetailDTO> getMessageDetail(@PathVariable String messageId) {
+        MessageDetailDTO messageDetailDTO = messageService.getMessageDetail(messageId);
+        return MessageResponse.<MessageDetailDTO>builder()
+                .message("Lấy thông tin tin nhắn thành công.")
+                .data(messageDetailDTO)
+                .build();
     }
 
     @PutMapping("/{messageId}/received")
@@ -72,6 +87,35 @@ public class MessageController {
                 .data(null)
                 .build();
     }
+
+    @PostMapping("/{messageId}/reactions")
+    public MessageResponse<String> addReactionToMessage(@PathVariable String messageId,
+                                                        @RequestParam String emoji) {
+        messageService.addReactionToMessage(messageId, emoji);
+        return MessageResponse.<String>builder()
+                .message("Reaction tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
+
+    @DeleteMapping("/{messageId}/reactions")
+    public MessageResponse<String> removeReactionToMessage(@PathVariable String messageId) {
+        messageService.removeReactionToMessage(messageId);
+        return MessageResponse.<String>builder()
+                .message("Xoá reaction tin nhắn thành công.")
+                .data(null)
+                .build();
+    }
+
+    @GetMapping("/{messageId}/reactions")
+    public MessageResponse<ReactionInfoDTO> getReactionInfo(@PathVariable String messageId) {
+        ReactionInfoDTO ReactionInfoDTO = messageService.getReactionInfoByMessageId(messageId);
+        return MessageResponse.<ReactionInfoDTO>builder()
+                .message("Lấy thông tin reaction tin nhắn thành công.")
+                .data(ReactionInfoDTO)
+                .build();
+    }
+
 
 
 }

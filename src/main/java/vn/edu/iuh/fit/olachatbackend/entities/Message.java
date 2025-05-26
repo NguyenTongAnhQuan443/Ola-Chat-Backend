@@ -38,12 +38,24 @@ public class Message {
     private List<Mention> mentions;
     private ObjectId replyTo;
 
+    private List<Reaction> reactions;
+
     @Data
     @Builder
     public static class DeletedStatus {
         private String userId;
         private LocalDateTime deletedAt;
     }
+
+    @Data
+    @Builder
+    public static class Reaction {
+        private String userId;
+        private String emoji;
+        private Integer count;
+        private LocalDateTime reactedAt;
+    }
+
 }
 
 

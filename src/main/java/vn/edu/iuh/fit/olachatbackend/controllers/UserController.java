@@ -7,10 +7,10 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
 import org.springframework.http.MediaType;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.ChangePasswordRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetContactAliasRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.FriendResponse;
 import jakarta.validation.Valid;
@@ -18,7 +18,6 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserSearchResponse;
-import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.services.FriendService;
 import vn.edu.iuh.fit.olachatbackend.services.UserService;
 
@@ -139,7 +138,14 @@ public class UserController {
                 .build();
     }
 
-
+    @PostMapping("/set-contact-alias")
+    public MessageResponse<Void> setNickname(@RequestBody SetContactAliasRequest request) {
+        userService.setContactAlias(request);
+        return MessageResponse.<Void>builder()
+                .message("Đặt tên gợi nhớ thành công.")
+                .data(null)
+                .build();
+    }
 
 
 }
