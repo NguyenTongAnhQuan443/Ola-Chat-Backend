@@ -18,30 +18,30 @@ pipeline {
         stage('Add Firebase Service Account') {
             steps {
                 withCredentials([file(credentialsId: 'firebase-service-account', variable: 'FIREBASE_KEY_FILE')]) {
-                    bat 'copy %FIREBASE_KEY_FILE% src\\main\\resources\\serviceAccountKey.json'
+                    sh 'copy %FIREBASE_KEY_FILE% src\\main\\resources\\serviceAccountKey.json'
                 }
             }
         }
         stage('Build') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                sh 'mvn clean package -DskipTests'
             }
         }
         stage('Login to DockerHub') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
-                    bat 'docker login -u %DOCKER_HUB_USER% -p %DOCKER_HUB_PASS%'
+                    sh 'docker login -u %DOCKER_HUB_USER% -p %DOCKER_HUB_PASS%'
                 }
             }
         }
         stage('Build Docker Image') {
             steps {
-                bat "docker build -t %REGISTRY%/%IMAGE_NAME%:%TAG% ."
+                sh "docker build -t %REGISTRY%/%IMAGE_NAME%:%TAG% ."
             }
         }
         stage('Push Docker Image') {
             steps {
-                bat "docker push %REGISTRY%/%IMAGE_NAME%:%TAG%"
+                sh "docker push %REGISTRY%/%IMAGE_NAME%:%TAG%"
             }
         }
     }
