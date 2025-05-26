@@ -1,17 +1,26 @@
-# Dùng image Java 17 nhẹ
-FROM eclipse-temurin:17-jre-alpine
+# Build stage
+FROM maven:3.8.6-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Tạo thư mục làm việc (tùy chọn, giúp tổ chức file gọn hơn)
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Copy file JAR đã build vào container
-COPY target/*.jar OlaChat-Backend-0.0.1-SNAPSHOT.jar
+# Install curl for healthchecks
+RUN apk add --no-cache curl
 
-# Copy file serviceAccountKey.json vào container (sẽ copy từ Jenkins workspace)
-COPY serviceAccountKey.json serviceAccountKey.json
+# Copy jar
+COPY --from=build /app/target/*.jar ola-chat-backend.jar
 
-# Mở port 8080
+# Create directories for secrets
+RUN mkdir -p /etc/secrets
+
+# Copy entrypoint script
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8080
-
-# Lệnh chạy app
-ENTRYPOINT ["java", "-jar", "/app/OlaChat-Backend-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["./entrypoint.sh"]

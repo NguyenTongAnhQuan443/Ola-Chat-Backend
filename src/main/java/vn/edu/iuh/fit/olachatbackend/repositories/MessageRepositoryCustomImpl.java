@@ -48,7 +48,7 @@ public class MessageRepositoryCustomImpl {
         List<Criteria> criteriaList = new ArrayList<>();
 
         criteriaList.add(Criteria.where("conversationId").is(new ObjectId(conversationId)));
-        criteriaList.add(Criteria.where("type").ne(MessageType.SYSTEM));
+        criteriaList.add(Criteria.where("type").is(MessageType.TEXT));
 
         if (keyword != null && !keyword.isBlank()) {
             criteriaList.add(Criteria.where("content").regex(keyword, "i")); // ignore case
