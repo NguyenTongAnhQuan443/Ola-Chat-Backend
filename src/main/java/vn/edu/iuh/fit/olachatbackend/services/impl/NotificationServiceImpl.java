@@ -239,7 +239,6 @@ public class NotificationServiceImpl implements NotificationService {
                 try {
                     sendNotificationToAllDevices(receiverId, title, body, type, senderId);
                 } catch (Exception e) {
-                    // Log lỗi gửi riêng cho 1 user nhưng không làm gián đoạn vòng lặp
                     System.err.println("Error sending to user " + receiverId + ": " + e.getMessage());
                 }
             }
