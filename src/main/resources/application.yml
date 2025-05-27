@@ -76,3 +76,5 @@ weather:
   api:
     key: ${WEATHER_API_KEY}
 
+SERVER:
+  port: ${SERVER_PORT:8081}
