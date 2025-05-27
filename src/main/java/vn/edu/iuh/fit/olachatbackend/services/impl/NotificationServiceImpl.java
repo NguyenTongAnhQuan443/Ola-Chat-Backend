@@ -55,7 +55,6 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationMapper notificationMapper;
     private final DeviceTokenRepository deviceTokenRepository;
     private final ConversationRepository conversationRepository;
-    private final UserServiceImpl userServiceImpl;
     private final ParticipantRepository participantRepository;
 
     @Override
@@ -79,6 +78,20 @@ public class NotificationServiceImpl implements NotificationService {
         deviceToken.setDeviceId(request.getDeviceId());
 
         deviceTokenRepository.save(deviceToken);
+    }
+
+    @Override
+    public void removeDevice(String userId, String deviceId) {
+        DeviceToken deviceToken = deviceTokenRepository.findByDeviceId(deviceId);
+        if (deviceToken == null) {
+            throw new NotFoundException("Device not found");
+        }
+
+        if (!deviceToken.getUserId().equals(userId)) {
+            throw new BadRequestException("Device token does not belong to user");
+        }
+
+        deviceTokenRepository.delete(deviceToken);
     }
 
     private void validateDeviceRequest(RegisterDeviceRequest request) {
@@ -213,7 +226,7 @@ public class NotificationServiceImpl implements NotificationService {
             Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
                     .orElseThrow(() -> new NotFoundException("Conversation not found"));
 
-            UserResponse sender = userServiceImpl.getUserById(senderId);
+//            UserResponse sender = userServiceImpl.getUserById(senderId);
 
             List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 

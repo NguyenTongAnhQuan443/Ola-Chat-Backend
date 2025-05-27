@@ -23,6 +23,7 @@ import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
 
 public interface NotificationService {
     void registerDevice(RegisterDeviceRequest request);
+    void removeDevice(String userId, String deviceId);
     NotificationPageDTO getNotificationsByUser(String userId, Pageable pageable);
     void markAsRead(String notificationId);
     void notifyConversation(String conversationId, String senderId, String title, String body, NotificationType type);
