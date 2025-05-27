@@ -226,8 +226,6 @@ public class NotificationServiceImpl implements NotificationService {
             Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
                     .orElseThrow(() -> new NotFoundException("Conversation not found"));
 
-//            UserResponse sender = userServiceImpl.getUserById(senderId);
-
             List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
             for (Participant participant : participants) {
