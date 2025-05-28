@@ -143,8 +143,21 @@ public class RedisService {
     public void saveQRCodeToken(QrLoginSession session, Duration ttl) throws JsonProcessingException {
         String key = QR_CODE_PREFIX + session.getSessionId();
         String value = objectMapper.writeValueAsString(session);
-        redisTemplate.opsForValue().set(key + value, "PENDING", ttl);
+        redisTemplate.opsForValue().set(key, value, ttl);
     }
 
+    public QrLoginSession getQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        String json = redisTemplate.opsForValue().get(key);
+
+        if (json == null) return null;
+
+        try {
+            return objectMapper.readValue(json, QrLoginSession.class);
+        } catch (JsonProcessingException e) {
+            System.err.println("Lỗi khi lấy QRCode!");
+            return null;
+        }
+    }
 }
 

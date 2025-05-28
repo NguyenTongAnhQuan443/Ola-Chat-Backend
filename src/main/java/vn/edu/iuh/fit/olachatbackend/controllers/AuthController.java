@@ -9,6 +9,7 @@ import org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleSelfExe
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.AuthenticationResponse;
@@ -112,11 +113,11 @@ public class AuthController {
         );
     }
 
-    @PostMapping("/qr-login/confirm")
-    public ResponseEntity<MessageResponse<Void>> confirm(@RequestBody String qrToken) {
-        qrLoginService.confirm(qrToken);
+    @PostMapping("/qr-login/scan")
+    public ResponseEntity<MessageResponse<QrLoginSession>> scanQrAndGetInfo(@RequestParam String sessionId) {
+        QrLoginSession qrLoginSession = qrLoginService.scanQrAndGetInfo(sessionId);
         return ResponseEntity.ok(
-                new MessageResponse<>(200, "Xác thực QR đăng nhập thành công.", true, null)
+                new MessageResponse<>(200, "Lấy thông tin từ QR code thành công.", true, qrLoginSession)
         );
     }
 

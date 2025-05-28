@@ -13,9 +13,11 @@ package vn.edu.iuh.fit.olachatbackend.services;
  */
 
 import jakarta.servlet.http.HttpServletRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.QrSessionRequest;
 
 public interface QRLoginService {
     String createQrToken(QrSessionRequest request, HttpServletRequest httpRequest);
+    QrLoginSession scanQrAndGetInfo(String sessionId);
     void confirm(String qrToken);
 }

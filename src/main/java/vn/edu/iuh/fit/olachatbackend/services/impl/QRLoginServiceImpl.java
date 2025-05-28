@@ -19,18 +19,16 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
-import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.QrSessionRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
-import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
-import vn.edu.iuh.fit.olachatbackend.services.AuthenticationService;
 import vn.edu.iuh.fit.olachatbackend.services.QRLoginService;
 import vn.edu.iuh.fit.olachatbackend.services.RedisService;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -65,7 +63,26 @@ public class QRLoginServiceImpl implements QRLoginService {
             System.err.println("Lỗi khi tạo token: "+ ex.getMessage());
             return null;
         }
-        return "https://ola-chat-backend-latest-ir9h.onrender.com/ola-chat/auth/scan?sessionId="+sessionId;
+        return "https://ola-chat-backend-latest-ir9h.onrender.com/ola-chat/auth/qr-login/scan?sessionId="+sessionId;
+    }
+
+    @Override
+    public QrLoginSession scanQrAndGetInfo(String sessionId) {
+        User currentUser = getCurrentUser();
+        QrLoginSession session = redisService.getQRCodeToken(sessionId);
+
+        // Assign userId
+        session.setConfirmedUserId(currentUser.getId());
+
+        // Send to web
+        String webSocketTopic = "/topic/qr/" + sessionId;
+        messagingTemplate.convertAndSend(webSocketTopic, Map.of(
+                "type", "USER_INFO_PREVIEW",
+                "user", Map.of("name", currentUser.getDisplayName(),
+                                    "avatar", currentUser.getAvatar())
+        ));
+
+        return session;
     }
 
     @Override
