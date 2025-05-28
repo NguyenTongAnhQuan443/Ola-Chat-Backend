@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -92,7 +94,44 @@ public class RedisService {
         redisTemplate.delete(EMAIL_UPDATE_PREFIX + userId);
     }
 
+    //    Nguyễn Quân
+    private static final String CALL_PREFIX = "call:"; // Key dạng: call:channelId
 
+    // Set trạng thái gọi mới (Pending)
+    public void setCallPending(String channelId, String callerId, String receiverId, long timeoutSeconds) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", "PENDING");
+        data.put("callerId", callerId);
+        data.put("receiverId", receiverId);
+        redisTemplate.opsForHash().putAll(CALL_PREFIX + channelId, data);
+        redisTemplate.expire(CALL_PREFIX + channelId, timeoutSeconds, TimeUnit.SECONDS);
+    }
+
+    // Set trạng thái Accept
+    public void setCallAccepted(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "ACCEPTED");
+    }
+
+    // Set trạng thái Reject
+    public void setCallRejected(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "REJECTED");
+    }
+
+    // Set trạng thái Cancel
+    public void setCallCanceled(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "CANCELED");
+    }
+
+    // Get trạng thái hiện tại của call
+    public String getCallStatus(String channelId) {
+        Object status = redisTemplate.opsForHash().get(CALL_PREFIX + channelId, "status");
+        return status != null ? status.toString() : null;
+    }
+
+    // Xoá trạng thái cuộc gọi (sau khi xong)
+    public void deleteCall(String channelId) {
+        redisTemplate.delete(CALL_PREFIX + channelId);
+    }
 
 }
 
