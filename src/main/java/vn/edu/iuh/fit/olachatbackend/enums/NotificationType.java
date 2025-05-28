@@ -4,6 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum NotificationType {
+    LOGIN_QR("LOGIN_QR"),
     FRIEND_REQUEST("FRIEND_REQUEST"),
     MESSAGE("MESSAGE"),
     MENTION("MENTION"),

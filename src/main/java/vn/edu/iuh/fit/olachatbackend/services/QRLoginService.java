@@ -19,5 +19,5 @@ import vn.edu.iuh.fit.olachatbackend.dtos.requests.QrSessionRequest;
 public interface QRLoginService {
     String createQrToken(QrSessionRequest request, HttpServletRequest httpRequest);
     QrLoginSession scanQrAndGetInfo(String sessionId);
-    void confirm(String qrToken);
+    void confirm(String sessionId);
 }

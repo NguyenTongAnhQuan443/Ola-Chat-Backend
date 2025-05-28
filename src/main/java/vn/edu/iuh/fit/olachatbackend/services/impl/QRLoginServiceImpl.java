@@ -20,9 +20,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.QrSessionRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.AuthenticationResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
+import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
+import vn.edu.iuh.fit.olachatbackend.mappers.UserMapperImpl;
 import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.services.AuthenticationService;
 import vn.edu.iuh.fit.olachatbackend.services.QRLoginService;
 import vn.edu.iuh.fit.olachatbackend.services.RedisService;
 
@@ -36,9 +41,12 @@ import java.util.UUID;
 public class QRLoginServiceImpl implements QRLoginService {
 
     private final RedisService redisService;
-    private final Duration TTL = Duration.ofMinutes(3);
+    private final Duration TTL = Duration.ofMinutes(5);
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
+    private final AuthenticationService authenticationService;
+    private final UserMapperImpl userMapper;
+    private final NotificationServiceImpl notificationService;
 
     @Override
     public String createQrToken(QrSessionRequest request, HttpServletRequest httpRequest) {
@@ -86,27 +94,35 @@ public class QRLoginServiceImpl implements QRLoginService {
     }
 
     @Override
-    public void confirm(String qrToken) {
-//        if (!redisService.isValid(qrToken)) {
-//            throw new BadRequestException("QR invalid!");
-//        }
-//
-//        if (redisService.isAlreadyUsed(qrToken)) {
-//            throw new BadRequestException("QR already used!");
-//        }
-//
-//        User currentUser = getCurrentUser();
-//
-//        redisService.markAsUsed(qrToken, currentUser.getId());
-//
-//        // Gửi thông báo qua WebSocket tới browser
-//        messagingTemplate.convertAndSend("/topic/qr/" + qrToken, Map.of(
-//                "status", "CONFIRMED",
-//                "userId", userId,
-//                "accessToken", jwt
-//        ));
-//
-//        return ResponseEntity.ok("Confirmed");
+    public void confirm(String sessionId) {
+        User currentUser = getCurrentUser();
+
+        // Check session
+        QrLoginSession session = redisService.getQRCodeToken(sessionId);
+        if (session == null) {
+            throw new BadRequestException("Không tìm thấy session!");
+        }
+
+        // Delete QRCode
+        redisService.deleteQRCodeToken(sessionId);
+
+        // Create new JWT
+        String accessToken = authenticationService.generateToken(currentUser, session.getDeviceId(), false);
+        String refreshToken = authenticationService.generateToken(currentUser, session.getDeviceId(), true);
+
+        AuthenticationResponse response = AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .authenticated(true)
+                .user(userMapper.toUserResponse(currentUser))
+                .build();
+
+        // Sent user info to web
+        messagingTemplate.convertAndSend("/topic/qr/" + sessionId, response);
+
+        // notify to user
+        notificationService.notifyUser(currentUser.getId(), "Xác nhận hành động đăng nhập", "Bạn vừa đăng nhập vào tài khoản từ một thiết bị mới thông qua mã QR thành công",
+                NotificationType.LOGIN_QR, "System");
     }
 
     private User getCurrentUser() {

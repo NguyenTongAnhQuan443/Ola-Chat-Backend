@@ -159,5 +159,10 @@ public class RedisService {
             return null;
         }
     }
+
+    public void deleteQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        redisTemplate.delete(key);
+    }
 }
 

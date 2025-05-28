@@ -121,5 +121,12 @@ public class AuthController {
         );
     }
 
+    @PostMapping("/qr-login/confirm")
+    public ResponseEntity<MessageResponse<Void>> confirm(@RequestParam String sessionId) {
+        qrLoginService.confirm(sessionId);
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Xác thực thông tin thành công.", true, null)
+        );
+    }
 
 }
