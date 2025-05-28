@@ -80,10 +80,13 @@ public class QRLoginServiceImpl implements QRLoginService {
         QrLoginSession session = redisService.getQRCodeToken(sessionId);
 
         // Assign userId
+        if (session == null) {
+            throw new BadRequestException("Không tìm thấy session");
+        }
         session.setConfirmedUserId(currentUser.getId());
 
         // Send to web
-        String webSocketTopic = "/topic/qr/" + sessionId;
+        String webSocketTopic = "/user/queue/qr-login/" + sessionId;
         messagingTemplate.convertAndSend(webSocketTopic, Map.of(
                 "type", "USER_INFO_PREVIEW",
                 "user", Map.of("name", currentUser.getDisplayName(),
@@ -118,7 +121,7 @@ public class QRLoginServiceImpl implements QRLoginService {
                 .build();
 
         // Sent user info to web
-        messagingTemplate.convertAndSend("/topic/qr/" + sessionId, response);
+        messagingTemplate.convertAndSend("/user/queue/qr-login/" + sessionId, response);
 
         // notify to user
         notificationService.notifyUser(currentUser.getId(), "Xác nhận hành động đăng nhập", "Bạn vừa đăng nhập vào tài khoản từ một thiết bị mới thông qua mã QR thành công",
