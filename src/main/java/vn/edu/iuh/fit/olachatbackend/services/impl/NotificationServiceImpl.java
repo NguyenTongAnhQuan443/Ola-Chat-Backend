@@ -24,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.NotificationDTO;
 import vn.edu.iuh.fit.olachatbackend.dtos.NotificationPageDTO;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.CallNotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.NotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.RegisterDeviceRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserResponse;
@@ -174,10 +175,10 @@ public class NotificationServiceImpl implements NotificationService {
      * Sends notification to all devices of a user
      *
      * @param receiveId The user ID to send notification to
-     * @param title Notification title
-     * @param body Notification body
-     * @param type Notification type
-     * @param senderId Sender ID
+     * @param title     Notification title
+     * @param body      Notification body
+     * @param type      Notification type
+     * @param senderId  Sender ID
      */
     private void sendNotificationToAllDevices(String receiveId, String title, String body,
                                               NotificationType type, String senderId) {
@@ -225,7 +226,7 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             Conversation conversation = conversationRepository.findById(new ObjectId(conversationId))
                     .orElseThrow(() -> new NotFoundException("Conversation not found"));
-
+            
             List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
             for (Participant participant : participants) {
@@ -293,5 +294,57 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    //    Nguyễn Quân
+    @Override
+    public void sendCallNotification(CallNotificationRequest req) {
+        try {
+            Message.Builder builder = Message.builder()
+                    .setToken(req.getToken())
+                    .setNotification(com.google.firebase.messaging.Notification.builder()
+                            .setTitle(req.getTitle())
+                            .setBody(req.getBody())
+                            .build())
+                    .putData("senderId", req.getSenderId())
+                    .putData("receiverId", req.getReceiverId())
+                    .putData("channelId", req.getChannelId())
+                    .putData("agoraToken", req.getAgoraToken() != null ? req.getAgoraToken() : "")
+                    .putData("callType", req.getCallType() != null ? req.getCallType() : "VIDEO")
+                    .putData("action", req.getAction() != null ? req.getAction() : "OFFER");
+            if (req.getExtra() != null) {
+                req.getExtra().forEach(builder::putData);
+            }
+            firebaseMessaging.send(builder.build());
+            logger.info("Sent call notification ({}) to: {}", req.getAction(), req.getToken());
+        } catch (Exception e) {
+            logger.error("Failed to send call notification: {}", e.getMessage());
+            throw new InternalServerErrorException("Error sending call notification: " + e.getMessage());
+        }
+    }
+
+    // Tiện dụng cho từng trạng thái (nếu muốn tách rõ hơn)
+    @Override
+    public void sendCallCanceledFCM(CallNotificationRequest req) {
+        req.setAction("CANCEL");
+        req.setTitle("Cuộc gọi bị huỷ");
+        req.setBody("Đối phương đã huỷ cuộc gọi.");
+        sendCallNotification(req);
+    }
+
+    @Override
+    public void sendCallAcceptedFCM(CallNotificationRequest req) {
+        req.setAction("ACCEPT");
+        req.setTitle("Cuộc gọi được chấp nhận");
+        req.setBody("Đối phương đã trả lời cuộc gọi.");
+        sendCallNotification(req);
+    }
+
+    @Override
+    public void sendCallRejectedFCM(CallNotificationRequest req) {
+        req.setAction("REJECT");
+        req.setTitle("Cuộc gọi bị từ chối");
+        req.setBody("Đối phương đã từ chối cuộc gọi.");
+        sendCallNotification(req);
+    }
 
 }
+

@@ -12,8 +12,14 @@ public enum NotificationType {
     POST_LIKE("POST_LIKE"),
     POST_COMMENT("POST_COMMENT"),
     POST_SHARE("POST_SHARE"),
-    POST_COMMENT_REPLY("POST_COMMENT_REPLY");
+    POST_COMMENT_REPLY("POST_COMMENT_REPLY"),
 
+//    Call
+    CALL_OFFER("CALL_OFFER"),
+    CALL_ACCEPTED("CALL_ACCEPTED"),
+    CALL_REJECTED("CALL_REJECTED"),
+    CALL_CANCELED("CALL_CANCELED"),
+    CALL_MISSED("CALL_MISSED");
     private final String value;
 
     NotificationType(String value) {
