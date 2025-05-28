@@ -27,4 +27,5 @@ public class NotificationRequest {
     private String receiverId;
     private String token;
     private NotificationType type;
+
 }
