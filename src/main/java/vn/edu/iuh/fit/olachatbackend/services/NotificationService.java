@@ -32,7 +32,7 @@ public interface NotificationService {
     void notifyGuestUser(String deviceId, String title, String body, NotificationType type);
     void notifyUser(String receiverId, String title, String body, NotificationType type, String senderId);
     void sendCallNotification(CallNotificationRequest request);
-    public void sendCallCanceledFCM(CallNotificationRequest req);
-    public void sendCallAcceptedFCM(CallNotificationRequest req);
-    public void sendCallRejectedFCM(CallNotificationRequest req);
+    void sendCallCanceledFCM(CallNotificationRequest req);
+    void sendCallAcceptedFCM(CallNotificationRequest req);
+    void sendCallRejectedFCM(CallNotificationRequest req);
 }
