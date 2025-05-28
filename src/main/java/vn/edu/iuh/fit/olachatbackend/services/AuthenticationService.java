@@ -262,7 +262,7 @@ public class AuthenticationService {
                 .build();
     }
 
-    private String generateToken(User user, String deviceId, boolean isRefreshToken) {
+    public String generateToken(User user, String deviceId, boolean isRefreshToken) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
         Instant now = Instant.now();

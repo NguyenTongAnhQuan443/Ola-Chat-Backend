@@ -31,6 +31,7 @@ public class SecurityConfig {
     private final String[] PUBLIC_ENDPOINTS = {
             "/auth/login/**", "/auth/introspect", "/auth/logout", "/auth/forgot-password", "/auth/reset-password","/app/**",
             "/auth/refresh",
+            "/auth/qr-login/create",
             "/v3/api-docs/**", "/swagger-ui/**",
             "/ws", "/ws/**",
             "/twilio/**",

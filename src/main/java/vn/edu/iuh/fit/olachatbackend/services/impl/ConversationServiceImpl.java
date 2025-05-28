@@ -38,16 +38,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-    public class ConversationServiceImpl implements ConversationService {
+public class ConversationServiceImpl implements ConversationService {
     private final ConversationRepository conversationRepository;
     private final ParticipantRepository participantRepository;
-    private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final ConversationMapperImpl conversationMapperImpl;
-    private final ParticipantMapper participantMapper;
     private final DeletedConversationRepository deletedConversationRepository;
-
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
         Conversation conversation = Conversation.builder()
@@ -99,6 +96,15 @@ import java.util.stream.Collectors;
         // Create conversation response (exclude deleted)
         return conversations.stream()
                 .filter(convo -> !deletedConversationIds.contains(convo.getId().toHexString()))
+                .sorted((c1, c2) -> {
+                    // If either one has no lastMessage, bring the one with lastMessage first.
+                    if (c1.getLastMessage() == null && c2.getLastMessage() == null) return 0;
+                    if (c1.getLastMessage() == null) return 1;
+                    if (c2.getLastMessage() == null) return -1;
+
+                    // Compare by createAt of lastMessage (newest to top)
+                    return c2.getLastMessage().getCreatedAt().compareTo(c1.getLastMessage().getCreatedAt());
+                })
                 .map(conversation -> ConversationResponse.builder()
                         .id(conversation.getId() != null ? conversation.getId().toHexString() : null)
                         .name(conversation.getName())
@@ -109,6 +115,7 @@ import java.util.stream.Collectors;
                         .updatedAt(conversation.getUpdatedAt())
                         .build())
                 .toList();
+
     }
 
 

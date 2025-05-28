@@ -1,9 +1,13 @@
 package vn.edu.iuh.fit.olachatbackend.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -11,12 +15,15 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@RequiredArgsConstructor
 public class RedisService {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
-
+    private final ObjectMapper objectMapper;
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     private static final String EMAIL_UPDATE_PREFIX = "email:update:";
+    private static final String QR_CODE_PREFIX = "QR:";
+
 
     public void saveWhitelistedToken(String jit, String token, long duration, TimeUnit timeUnit) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + jit, token, duration, timeUnit);
@@ -133,5 +140,29 @@ public class RedisService {
         redisTemplate.delete(CALL_PREFIX + channelId);
     }
 
+    public void saveQRCodeToken(QrLoginSession session, Duration ttl) throws JsonProcessingException {
+        String key = QR_CODE_PREFIX + session.getSessionId();
+        String value = objectMapper.writeValueAsString(session);
+        redisTemplate.opsForValue().set(key, value, ttl);
+    }
+
+    public QrLoginSession getQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        String json = redisTemplate.opsForValue().get(key);
+
+        if (json == null) return null;
+
+        try {
+            return objectMapper.readValue(json, QrLoginSession.class);
+        } catch (JsonProcessingException e) {
+            System.err.println("Lỗi khi lấy QRCode!");
+            return null;
+        }
+    }
+
+    public void deleteQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        redisTemplate.delete(key);
+    }
 }
 
