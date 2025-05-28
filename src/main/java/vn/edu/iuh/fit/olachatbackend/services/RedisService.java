@@ -17,6 +17,7 @@ public class RedisService {
 
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     private static final String EMAIL_UPDATE_PREFIX = "email:update:";
+    private static final String QR_CODE_PREFIX = "QR:";
 
     public void saveWhitelistedToken(String jit, String token, long duration, TimeUnit timeUnit) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + jit, token, duration, timeUnit);
@@ -131,6 +132,10 @@ public class RedisService {
     // Xoá trạng thái cuộc gọi (sau khi xong)
     public void deleteCall(String channelId) {
         redisTemplate.delete(CALL_PREFIX + channelId);
+    }
+
+    public void saveQRCodeToken(String token, Duration ttl) {
+        redisTemplate.opsForValue().set(QR_CODE_PREFIX + token, "PENDING", ttl);
     }
 
 }

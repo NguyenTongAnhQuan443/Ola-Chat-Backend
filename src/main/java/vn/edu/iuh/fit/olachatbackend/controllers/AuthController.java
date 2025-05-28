@@ -3,6 +3,7 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
 import com.nimbusds.jose.JOSEException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleSelfExecuting;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -12,15 +13,17 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.AuthenticationResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.IntrospectResponse;
 import vn.edu.iuh.fit.olachatbackend.services.AuthenticationService;
+import vn.edu.iuh.fit.olachatbackend.services.QRLoginService;
 
 import java.text.ParseException;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthController {
-    @Autowired
-    private AuthenticationService authenticationService;
+    private final AuthenticationService authenticationService;
+    private final QRLoginService qrLoginService;
 
     @PostMapping("/login")
     MessageResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request, HttpServletResponse response) throws ParseException {
@@ -97,6 +100,14 @@ public class AuthController {
         return ResponseEntity.ok(MessageResponse.builder()
                 .message("Reset mật khẩu thành công.")
                 .build());
+    }
+
+    @PostMapping("/api/qr-login/create")
+    public ResponseEntity<MessageResponse<String>> createQr() {
+        String qrToken = qrLoginService.createQrToken();
+        return ResponseEntity.ok(
+                new MessageResponse<String>(200, "Tạo QR đăng nhập thành công", true, qrToken)
+        );
     }
 
 
