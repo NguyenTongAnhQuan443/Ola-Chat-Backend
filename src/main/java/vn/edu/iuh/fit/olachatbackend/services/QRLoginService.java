@@ -12,9 +12,10 @@ package vn.edu.iuh.fit.olachatbackend.services;
  * @version:    1.0
  */
 
+import jakarta.servlet.http.HttpServletRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.QrSessionRequest;
+
 public interface QRLoginService {
-    String createQrToken();
-    boolean isValid(String token);
-    void markAsUsed(String token, String userId);
-    boolean isAlreadyUsed(String token);
+    String createQrToken(QrSessionRequest request, HttpServletRequest httpRequest);
+    void confirm(String qrToken);
 }

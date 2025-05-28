@@ -1,6 +1,7 @@
 package vn.edu.iuh.fit.olachatbackend.controllers;
 
 import com.nimbusds.jose.JOSEException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -102,15 +103,22 @@ public class AuthController {
                 .build());
     }
 
-    @PostMapping("/api/qr-login/create")
-    public ResponseEntity<MessageResponse<String>> createQr() {
-        String qrToken = qrLoginService.createQrToken();
+    @PostMapping("/qr-login/create")
+    public ResponseEntity<MessageResponse<String>> createQr(@RequestBody QrSessionRequest request,
+                                                            HttpServletRequest httpRequest) {
+        String qrUrl = qrLoginService.createQrToken(request, httpRequest);
         return ResponseEntity.ok(
-                new MessageResponse<String>(200, "Tạo QR đăng nhập thành công", true, qrToken)
+                new MessageResponse<>(200, "Tạo QR đăng nhập thành công.", true, qrUrl)
         );
     }
 
-
+    @PostMapping("/qr-login/confirm")
+    public ResponseEntity<MessageResponse<Void>> confirm(@RequestBody String qrToken) {
+        qrLoginService.confirm(qrToken);
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Xác thực QR đăng nhập thành công.", true, null)
+        );
+    }
 
 
 }
