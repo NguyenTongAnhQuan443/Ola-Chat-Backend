@@ -20,8 +20,8 @@ import java.time.LocalDateTime;
 @Configuration
 public class ApplicationInitConfig {
 
-    @Autowired
-    PasswordEncoder passwordEncoder;
+//    @Autowired
+//    PasswordEncoder passwordEncoder;
 
 //    @Bean
 //    ApplicationRunner applicationRunner(UserRepository userRepository) { // Được khởi chạy mỗi khi application start

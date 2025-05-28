@@ -48,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AuthenticationService {
     @Autowired
     private UserRepository userRepository;
@@ -85,6 +84,9 @@ public class AuthenticationService {
     protected long VALID_DURATION;
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private NotificationService notificationService;
 
     public IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException {
         var token = request.getToken();
@@ -212,7 +214,14 @@ public class AuthenticationService {
 
             String username = refreshClaims.getSubject();
             Optional<User> user = userRepository.findByUsername(username);
+
+            if (user.isEmpty()) {
+                throw new NotFoundException("Không thể tìm thấy user!");
+            }
             loginHistoryService.saveLogout(user.map(User::getId).orElse(null));
+
+            // remove device
+            notificationService.removeDevice(user.get().getId(), accessDeviceId);
 
         } catch (UnauthorizedException e) {
             throw new BadRequestException("Token không hợp lệ hoặc đã hết hạn");
