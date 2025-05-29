@@ -12,7 +12,6 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;
  * @version:    1.0
  */
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.IntrospectRequest;
+import vn.edu.iuh.fit.olachatbackend.dtos.requests.SetContactAliasRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserRegisterRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.UserUpdateInfoRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.IntrospectResponse;
@@ -29,24 +29,20 @@ import vn.edu.iuh.fit.olachatbackend.dtos.responses.UserSearchResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.FriendRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
+import vn.edu.iuh.fit.olachatbackend.entities.ContactAlias;
 import vn.edu.iuh.fit.olachatbackend.enums.LoginHistoryStatus;
 import vn.edu.iuh.fit.olachatbackend.enums.RequestStatus;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
-import vn.edu.iuh.fit.olachatbackend.exceptions.InternalServerErrorException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.UnauthorizedException;
 import vn.edu.iuh.fit.olachatbackend.mappers.ParticipantMapper;
 import vn.edu.iuh.fit.olachatbackend.mappers.UserMapper;
-import vn.edu.iuh.fit.olachatbackend.repositories.FriendRequestRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.LoginHistoryRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.ParticipantRepository;
-import vn.edu.iuh.fit.olachatbackend.repositories.UserRepository;
+import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.*;
 import vn.edu.iuh.fit.olachatbackend.utils.OtpUtils;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +62,8 @@ public class UserServiceImpl implements UserService {
     private final ParticipantMapper participantMapper;
     private final LoginHistoryRepository loginHistoryRepository;
     private final FriendRequestRepository friendRequestRepository;
+    private final ContactAliasRepository userNicknameRepository;
+    private final ContactAliasRepository contactAliasRepository;
 
     public User saveUser(User user) {
         return userRepository.save(user);
@@ -127,6 +125,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<ParticipantResponse> getUsersByConversationId(String conversationId) {
+        User currentUser = getCurrentUser();
+
         List<Participant> participants = participantRepository.findParticipantByConversationId(new ObjectId(conversationId));
 
         List<String> userIds = participants.stream()
@@ -143,7 +143,8 @@ public class UserServiceImpl implements UserService {
         return parts.stream().map(p -> {
             ParticipantResponse pResponse = participantMapper.toParticipantResponse(p);
             User info = userRepository.findById(p.getUserId()).get();
-            pResponse.setDisplayName(info.getDisplayName());
+            // Set contact alias name
+            pResponse.setDisplayName(getAliasNameOrDefault(currentUser.getId(), info));
             pResponse.setAvatar(info.getAvatar());
             boolean status = loginHistoryRepository
                     .findTopByUserIdAndStatusOrderByLoginTimeDesc(p.getUserId(), LoginHistoryStatus.ONLINE)
@@ -362,6 +363,34 @@ public class UserServiceImpl implements UserService {
         redisService.deleteEmailUpdateOtp(userId);
 
         return userMapper.toUserResponse(savedUser);
+    }
+
+    @Override
+    public void setContactAlias(SetContactAliasRequest request) {
+        // Check ì user exists
+        User owner = getCurrentUser();
+        User target = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng cần đặt tên gợi nhớ."));
+
+        // Set nickname
+        ContactAlias userNickname = userNicknameRepository.findByOwnerIdAndTargetId(owner.getId(), target.getId())
+                .map(existing -> {
+                    existing.setAliasName(request.getAliasName());
+                    return existing;
+                })
+                .orElse(ContactAlias.builder()
+                        .owner(owner)
+                        .target(target)
+                        .aliasName(request.getAliasName())
+                        .build());
+
+        userNicknameRepository.save(userNickname);
+    }
+
+    public String getAliasNameOrDefault(String ownerId, User target) {
+        return contactAliasRepository.findByOwnerIdAndTargetId(ownerId, target.getId())
+                .map(ContactAlias::getAliasName)
+                .orElse(target.getDisplayName());
     }
 
     private User getCurrentUser() {

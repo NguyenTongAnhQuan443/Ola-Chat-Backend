@@ -12,6 +12,8 @@ package vn.edu.iuh.fit.olachatbackend.controllers;
  * @version:    1.0
  */
 
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.ConversationDTO;
@@ -22,6 +24,7 @@ import vn.edu.iuh.fit.olachatbackend.services.MessageService;
 import vn.edu.iuh.fit.olachatbackend.services.UserService;
 import vn.edu.iuh.fit.olachatbackend.utils.extractUserIdFromJwt;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -50,8 +53,11 @@ public class ConversationController {
     }
 
     @GetMapping(value = "/{id}/messages", produces = "application/json;charset=UTF-8")
-    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id) {
-        List<MessageDTO> messages = messageService.getMessagesByConversationId(id);
+    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String id,
+                                                                        @RequestParam(defaultValue = "0") int page,
+                                                                        @RequestParam(defaultValue = "20") int size,
+                                                                        @RequestParam(defaultValue = "desc") String sortDirection) {
+        List<MessageDTO> messages = messageService.getMessagesByConversationId(id, page, size, sortDirection);
         return ResponseEntity.ok(messages);
     }
 
@@ -98,5 +104,24 @@ public class ConversationController {
         return ResponseEntity.ok(
                 new MessageResponse<>(200, "Đã xoá cuộc trò chuyện thành công", true, null)
         );
+    }
+
+    @GetMapping("/{conversationId}/search")
+    public MessageResponse<Page<MessageSearchResponse>> searchMessages(
+            @PathVariable("conversationId") String conversationId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String senderId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Page<MessageSearchResponse> result = messageService.searchMessages(
+                conversationId, keyword, senderId, fromDate, toDate, page, size
+        );
+        return MessageResponse.<Page<MessageSearchResponse>>builder()
+                .message("Tìm kiếm tin nhắn thành công.")
+                .data(result)
+                .build();
     }
 }

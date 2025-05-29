@@ -1,20 +1,29 @@
 package vn.edu.iuh.fit.olachatbackend.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@RequiredArgsConstructor
 public class RedisService {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
-
+    private final ObjectMapper objectMapper;
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     private static final String EMAIL_UPDATE_PREFIX = "email:update:";
+    private static final String QR_CODE_PREFIX = "QR:";
+
 
     public void saveWhitelistedToken(String jit, String token, long duration, TimeUnit timeUnit) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + jit, token, duration, timeUnit);
@@ -92,7 +101,68 @@ public class RedisService {
         redisTemplate.delete(EMAIL_UPDATE_PREFIX + userId);
     }
 
+    //    Nguyễn Quân
+    private static final String CALL_PREFIX = "call:"; // Key dạng: call:channelId
 
+    // Set trạng thái gọi mới (Pending)
+    public void setCallPending(String channelId, String callerId, String receiverId, long timeoutSeconds) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", "PENDING");
+        data.put("callerId", callerId);
+        data.put("receiverId", receiverId);
+        redisTemplate.opsForHash().putAll(CALL_PREFIX + channelId, data);
+        redisTemplate.expire(CALL_PREFIX + channelId, timeoutSeconds, TimeUnit.SECONDS);
+    }
 
+    // Set trạng thái Accept
+    public void setCallAccepted(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "ACCEPTED");
+    }
+
+    // Set trạng thái Reject
+    public void setCallRejected(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "REJECTED");
+    }
+
+    // Set trạng thái Cancel
+    public void setCallCanceled(String channelId) {
+        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "CANCELED");
+    }
+
+    // Get trạng thái hiện tại của call
+    public String getCallStatus(String channelId) {
+        Object status = redisTemplate.opsForHash().get(CALL_PREFIX + channelId, "status");
+        return status != null ? status.toString() : null;
+    }
+
+    // Xoá trạng thái cuộc gọi (sau khi xong)
+    public void deleteCall(String channelId) {
+        redisTemplate.delete(CALL_PREFIX + channelId);
+    }
+
+    public void saveQRCodeToken(QrLoginSession session, Duration ttl) throws JsonProcessingException {
+        String key = QR_CODE_PREFIX + session.getSessionId();
+        String value = objectMapper.writeValueAsString(session);
+        redisTemplate.opsForValue().set(key, value, ttl);
+    }
+
+    public QrLoginSession getQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        String json = redisTemplate.opsForValue().get(key);
+
+        if (json == null) return null;
+
+        try {
+            return objectMapper.readValue(json, QrLoginSession.class);
+        } catch (JsonProcessingException e) {
+            System.err.println("Lỗi khi lấy QRCode!");
+            return null;
+        }
+    }
+
+    public void deleteQRCodeToken(String sessionId) {
+        String key = QR_CODE_PREFIX + sessionId;
+        redisTemplate.delete(key);
+    }
 }
 

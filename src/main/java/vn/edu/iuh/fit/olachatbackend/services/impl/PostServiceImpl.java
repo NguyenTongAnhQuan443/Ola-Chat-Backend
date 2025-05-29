@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.*;
 import vn.edu.iuh.fit.olachatbackend.entities.*;
+import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
 import vn.edu.iuh.fit.olachatbackend.enums.Privacy;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -18,13 +19,13 @@ import vn.edu.iuh.fit.olachatbackend.mappers.PostMapper;
 import vn.edu.iuh.fit.olachatbackend.repositories.*;
 import vn.edu.iuh.fit.olachatbackend.services.CommentService;
 import vn.edu.iuh.fit.olachatbackend.services.MediaService;
+import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 import vn.edu.iuh.fit.olachatbackend.services.PostService;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +44,8 @@ public class PostServiceImpl implements PostService {
 
     @Autowired
     private FavoriteRepository favoriteRepository;
+    @Autowired
+    private NotificationService notificationService;
 
     public PostServiceImpl(PostRepository postRepository, UserRepository userRepository, MediaService mediaService, LikeRepository likeRepository, FriendRepository friendRepository, CommentRepository commentRepository, CommentService commentService, ShareRepository shareRepository) {
         this.postRepository = postRepository;
@@ -331,6 +334,10 @@ public class PostServiceImpl implements PostService {
                 .build();
         shareRepository.save(share);
 
+        // Notification for post owner
+        notificationService.notifyUser(postToShare.getCreatedBy().getId(), "Bài viết của bạn được chia sẻ!",
+                currentUser.getDisplayName() + " đã chia sẻ bài viết của bạn.", NotificationType.POST_SHARE, currentUser.getId());
+
         return postMapper.toPostResponse(savedPost);
     }
 
@@ -398,6 +405,11 @@ public class PostServiceImpl implements PostService {
                 .likedBy(currentUser)
                 .build();
         likeRepository.save(like);
+
+        // Notification for post owner
+        notificationService.notifyUser(post.getCreatedBy().getId(), "Ai đó đã thích bài viết của bạn!",
+                currentUser.getDisplayName() + " đã thích bài viết của bạn", NotificationType.POST_LIKE, currentUser.getId());
+
     }
 
     @Override
@@ -487,6 +499,10 @@ public class PostServiceImpl implements PostService {
         // Lưu bình luận vào DB
         commentService.save(comment);
 
+        // Notification for post owner
+        notificationService.notifyUser(post.getCreatedBy().getId(), " Bạn có bình luận mới!",
+                currentUser.getDisplayName() + " đã để lại bình luận: " + comment.getContent(), NotificationType.POST_COMMENT, currentUser.getId());
+
         // Lấy tất cả bình luận của bài đăng
         List<Comment> allComments = commentService.findAllByPost(post);
 
@@ -548,6 +564,10 @@ public class PostServiceImpl implements PostService {
 
         // Lưu bình luận trả lời
         commentService.save(replyComment);
+
+        // Notification for comment owner
+        notificationService.notifyUser(parentComment.getCommentedBy().getId(), currentUser.getDisplayName() + " đã trả lời bình luận của bạn",
+                currentUser.getDisplayName() + " đã phản hồi bình luận của bạn: " + content, NotificationType.POST_COMMENT_REPLY, currentUser.getId());
 
         // Lấy tất cả bình luận của bài đăng
         List<Comment> allComments = commentService.findAllByPost(post);

@@ -1,5 +1,5 @@
 /*
- * @ (#) MessageDTO.java       1.0     15/02/2025
+ * @ (#) MessageDetailDTO.java       1.0     25/05/2025
  *
  * Copyright (c) 2025 IUH. All rights reserved.
  */
@@ -8,12 +8,11 @@ package vn.edu.iuh.fit.olachatbackend.dtos;
 /*
  * @description:
  * @author: Nguyen Thanh Nhut
- * @date: 15/02/2025
+ * @date: 25/05/2025
  * @version:    1.0
  */
 
 import lombok.*;
-import org.bson.types.ObjectId;
 import vn.edu.iuh.fit.olachatbackend.entities.DeliveryStatus;
 import vn.edu.iuh.fit.olachatbackend.entities.Mention;
 import vn.edu.iuh.fit.olachatbackend.entities.Message;
@@ -26,9 +25,9 @@ import java.util.List;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-public class MessageDTO {
+@AllArgsConstructor
+public class MessageDetailDTO {
     private String id;
     private String senderId;
     private String conversationId;
@@ -36,6 +35,8 @@ public class MessageDTO {
     private MessageType type;
     private List<String> mediaUrls;
     private MessageStatus status;
+    private List<DeliveryStatus> deliveryStatus;
+    private List<ReadStatus> readStatus;
     private List<Message.DeletedStatus> deletedStatus;
     private LocalDateTime createdAt;
     private boolean recalled;
@@ -46,3 +47,4 @@ public class MessageDTO {
     private int totalReactionCount;
     private String lastUserReaction;
 }
+

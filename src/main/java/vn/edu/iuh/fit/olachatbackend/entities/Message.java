@@ -33,22 +33,30 @@ public class Message {
     private List<ReadStatus> readStatus;
     private LocalDateTime createdAt;
 
-    private List<ReplyStatus> replyStatus;
     private List<DeletedStatus> deletedStatus;
     private boolean recalled = false;
+    private List<Mention> mentions;
+    private ObjectId replyTo;
+
+    private List<Reaction> reactions;
+
+    @Data
+    @Builder
+    public static class DeletedStatus {
+        private String userId;
+        private LocalDateTime deletedAt;
+    }
+
+    @Data
+    @Builder
+    public static class Reaction {
+        private String userId;
+        private String emoji;
+        private Integer count;
+        private LocalDateTime reactedAt;
+    }
 
 }
 
-@Data
-class ReplyStatus {
-    private String userId;
-    private LocalDateTime repliedAt;
-    private String replyMessageId;
-}
 
-@Data
-class DeletedStatus {
-    private String userId;
-    private LocalDateTime deletedAt;
-}
 
