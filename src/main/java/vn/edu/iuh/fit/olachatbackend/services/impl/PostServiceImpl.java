@@ -181,6 +181,40 @@ public class PostServiceImpl implements PostService {
         );
     }
 
+    @Override
+    public List<PostResponse> getUserPosts_v2(int page, int size) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable);
+
+        return postPage.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null);
+                }
+            }
+
+            // Use the postMapper to directly convert to PostResponse
+            return postMapper.toPostResponse(post);
+        }).collect(Collectors.toList());
+    }
+
     @Transactional
     public void deletePostById(Long postId) throws IOException {
         Post post = postRepository.findById(postId)
