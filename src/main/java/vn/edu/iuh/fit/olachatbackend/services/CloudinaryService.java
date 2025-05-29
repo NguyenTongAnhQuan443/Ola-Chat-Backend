@@ -2,6 +2,7 @@ package vn.edu.iuh.fit.olachatbackend.services;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.FileResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 
@@ -17,4 +18,5 @@ public interface CloudinaryService {
     Map<String, Object> downloadFile(String publicId, String savePath) throws IOException;
     UploadFilesResponse uploadFileAndSaveToDB_v2(List<MultipartFile> files, Long associatedIDMessageId) throws IOException;
     File uploadFileAndSaveToDB_v3(MultipartFile file, Long associatedIDMessageId) throws IOException;
+    FileResponse uploadAudioFile(MultipartFile audioFile) throws IOException;
 }
