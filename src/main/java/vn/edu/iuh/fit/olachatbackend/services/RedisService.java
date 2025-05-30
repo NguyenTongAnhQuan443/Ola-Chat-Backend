@@ -110,7 +110,7 @@ public class RedisService {
         try {
             CallSession session = new CallSession(callerId, type.getValue());
             String json = objectMapper.writeValueAsString(session);
-            redisTemplate.opsForValue().set(key, json, ttl.getSeconds(), TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(key, json, ttl);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create call session", e);
         }

@@ -59,21 +59,31 @@ public class CallServiceImpl implements CallService {
         // Save to redis
         redisService.createCallSession(request.getConversationId(), currentUser.getId(), request.getCallType(), Duration.ofDays(1));
 
-        // Notify for conversation
-        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi đến",
-                "Bạn có cuộc gọi từ " + currentUser.getDisplayName(), NotificationType.CALL_OFFER);
-
         // Schedule
         callTimeoutScheduler.schedule(() -> {
             if (redisService.getCallSession(conversation.getId().toString()) != null) {
-                handleCallTimeout(conversation.getId().toString());
+                handleCallTimeout(conversation.getId().toString(), currentUser);
             }
         }, 45, TimeUnit.SECONDS);
 
+        // Notify for conversation
+        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi đến",
+                "Bạn có cuộc gọi từ " + currentUser.getDisplayName(), NotificationType.CALL_OFFER);
     }
 
-    private void handleCallTimeout(String conversationId) {
+    private void handleCallTimeout(String conversationId, User sender) {
+
         System.out.println("Missed call");
+
+        // Notify for sender to cancel call
+        notificationService.notifyUser(sender.getId(), "Không có phản hồi",
+                "Không ai bắt máy cuộc gọi của bạn!", NotificationType.CALL_NO_RESPONSE, "System");
+
+        // Notify for conversation
+        notificationService.notifyConversation(conversationId, sender.getId(), "Cuộc gọi nhỡ",
+                "Bạn đã bỏ lỡ cuộc gọi từ " + sender.getDisplayName(), NotificationType.CALL_MISSED);
+
+        // Remove
         redisService.deleteCallSession(conversationId);
     }
 

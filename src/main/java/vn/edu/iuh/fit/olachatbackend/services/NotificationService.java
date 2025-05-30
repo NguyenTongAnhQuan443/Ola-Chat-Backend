@@ -31,7 +31,4 @@ public interface NotificationService {
     void notifyUserMentioned(String senderId, String receiverId, String conversationId, String title, String body, NotificationType notificationType);
     void notifyGuestUser(String deviceId, String title, String body, NotificationType type);
     void notifyUser(String receiverId, String title, String body, NotificationType type, String senderId);
-//    void sendCallCanceledFCM(CallNotificationRequest req);
-//    void sendCallAcceptedFCM(CallNotificationRequest req);
-//    void sendCallRejectedFCM(CallNotificationRequest req);
 }

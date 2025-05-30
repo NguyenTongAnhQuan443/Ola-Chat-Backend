@@ -20,7 +20,8 @@ public enum NotificationType {
     CALL_ACCEPTED("CALL_ACCEPTED"),
     CALL_REJECTED("CALL_REJECTED"),
     CALL_CANCELED("CALL_CANCELED"),
-    CALL_MISSED("CALL_MISSED");
+    CALL_MISSED("CALL_MISSED"),
+    CALL_NO_RESPONSE("CALL_NO_RESPONSE");
     private final String value;
 
     NotificationType(String value) {
