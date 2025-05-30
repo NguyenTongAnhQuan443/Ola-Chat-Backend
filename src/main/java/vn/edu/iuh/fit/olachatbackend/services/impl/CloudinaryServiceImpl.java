@@ -10,6 +10,7 @@ package vn.edu.iuh.fit.olachatbackend.services.impl;/*
  */
 
 import com.cloudinary.Cloudinary;
+import com.cloudinary.Transformation;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -29,10 +30,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class CloudinaryServiceImpl implements CloudinaryService {
@@ -291,63 +289,92 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
     @Override
     public FileResponse uploadAudioFile(MultipartFile audioFile) throws IOException {
-        // Validate file is audio/mp3
         String contentType = audioFile.getContentType();
-        if (contentType == null || !contentType.startsWith("audio/")) {
-            throw new IllegalArgumentException("File must be an audio file");
+        String originalFilename = audioFile.getOriginalFilename();
+
+        boolean isAudioFile = contentType != null && (
+                contentType.startsWith("audio/") ||
+                        contentType.equals("application/octet-stream")
+        );
+
+        if (!isAudioFile && originalFilename != null) {
+            String lowercaseName = originalFilename.toLowerCase();
+            isAudioFile = lowercaseName.endsWith(".mp3") ||
+                    lowercaseName.endsWith(".wav") ||
+                    lowercaseName.endsWith(".m4a") ||
+                    lowercaseName.endsWith(".aac") ||
+                    lowercaseName.endsWith(".ogg") ||
+                    lowercaseName.endsWith(".wma") ||
+                    lowercaseName.endsWith(".flac") ||
+                    lowercaseName.endsWith(".alac") ||
+                    lowercaseName.endsWith(".aiff") ||
+                    lowercaseName.endsWith(".m4v");
         }
 
-        var context = SecurityContextHolder.getContext();
-        String currentUsername = context.getAuthentication().getName();
+        if (!isAudioFile) {
+            throw new IllegalArgumentException("File must be an audio file (supported formats: MP3, AAC, WAV, etc.)");
+        }
 
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        // Process file name
-        String originalFilename = audioFile.getOriginalFilename();
         String baseFilename = "audio";
-        String extension = ".mp3";
-
         if (originalFilename != null && originalFilename.contains(".")) {
             int lastDotIndex = originalFilename.lastIndexOf(".");
             baseFilename = originalFilename.substring(0, lastDotIndex);
-            extension = originalFilename.substring(lastDotIndex);
         } else if (originalFilename != null) {
             baseFilename = originalFilename;
         }
 
-        // Sanitize filename
         String sanitizedBaseFilename = baseFilename.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
         String publicId = sanitizedBaseFilename + "--" + UUID.randomUUID();
 
-        // Important: Upload with resource_type=video (Cloudinary uses this for audio files)
+        // Tạo file tạm
+        java.io.File tempInputFile = java.io.File.createTempFile(sanitizedBaseFilename, null);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempInputFile)) {
+            fos.write(audioFile.getBytes());
+        }
+
+        // Upload với resource_type = "raw", thêm eager để chuyển sang mp3
         Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                audioFile.getBytes(),
+                tempInputFile,
                 ObjectUtils.asMap(
                         "resource_type", "video",
-                        "public_id", publicId
+                        "public_id", publicId,
+                        "eager", Collections.singletonList(
+                                new Transformation().fetchFormat("mp3")
+                        )
                 )
         );
+        // Lấy link mp3 trong eager
+        List<Map<String, String>> eagerResults = (List<Map<String, String>>) uploadResult.get("eager");
+        String url = eagerResults != null && !eagerResults.isEmpty()
+                ? eagerResults.get(0).get("secure_url")
+                : uploadResult.get("secure_url").toString();
 
-        String url = uploadResult.get("secure_url").toString();
         String returnedPublicId = uploadResult.get("public_id").toString();
+        long fileSize = tempInputFile.length();
 
-        // Save to database
+        // Lưu vào database
         File fileUpload = File.builder()
                 .fileUrl(url)
-                .fileType(audioFile.getContentType())
-                .fileSize(audioFile.getSize())
+                .fileType("audio/mpeg")
+                .fileSize(fileSize)
                 .uploadedAt(LocalDateTime.now())
                 .uploadedBy(user)
                 .associatedIDMessageId(null)
                 .publicId(returnedPublicId)
-                .resourceType("video") // Cloudinary uses "video" for audio files
+                .resourceType("raw")
                 .originalFileName(originalFilename)
                 .build();
 
         fileRepository.save(fileUpload);
 
-        // Return response
+        // Xóa file tạm
+        if (tempInputFile.exists()) tempInputFile.delete();
+
+        // Trả về response
         return new FileResponse(
                 fileUpload.getFileId(),
                 fileUpload.getFileUrl(),
