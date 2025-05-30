@@ -16,9 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import vn.edu.iuh.fit.olachatbackend.dtos.CallSession;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.CallNotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.entities.Conversation;
-import vn.edu.iuh.fit.olachatbackend.entities.Participant;
 import vn.edu.iuh.fit.olachatbackend.entities.User;
 import vn.edu.iuh.fit.olachatbackend.enums.NotificationType;
 import vn.edu.iuh.fit.olachatbackend.exceptions.BadRequestException;
@@ -57,7 +57,7 @@ public class CallServiceImpl implements CallService {
         findParticipantInGroup(conversation.getId(), currentUser.getId());
 
         // Save to redis
-        redisService.createCallSession(request.getConversationId(), request.getCallType(), Duration.ofDays(1));
+        redisService.createCallSession(request.getConversationId(), currentUser.getId(), request.getCallType(), Duration.ofDays(1));
 
         // Notify for conversation
         notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi đến",
@@ -88,14 +88,21 @@ public class CallServiceImpl implements CallService {
         // Check if user exists in conversation
         findParticipantInGroup(conversation.getId(), currentUser.getId());
 
+        CallSession session = redisService.getCallSession(conversation.getId().toString());
+
         // Check if call exists
-        if (redisService.getCallSession(conversation.getId().toString()) == null) {
+        if (session == null) {
             throw new NotFoundException("Không tìm thấy cuộc gọi");
         }
 
         // Check if call type valid
-        if (!redisService.getCallSession(conversation.getId().toString()).equals(request.getCallType().toString())) {
+        if (session.getType().equals(request.getCallType().toString())) {
             throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
+        }
+
+        // Check if user is sender
+        if (session.getCallerId().equals(currentUser.getId())) {
+            throw new BadRequestException("Người gọi không thể chấp nhận cuộc gọi của mình");
         }
 
         // Notify for conversation
@@ -108,6 +115,42 @@ public class CallServiceImpl implements CallService {
 
     @Override
     public void rejectCall(CallNotificationRequest request) {
+        User currentUser = getCurrentUser();
+
+        // Check conversation
+        Conversation conversation = conversationRepository.findById(new ObjectId(request.getConversationId()))
+                .orElseThrow(() -> new NotFoundException("Nhóm không tồn tại"));
+
+        // Check if user exists in conversation
+        findParticipantInGroup(conversation.getId(), currentUser.getId());
+
+        CallSession session = redisService.getCallSession(conversation.getId().toString());
+
+        // Check if call exists
+        if (session == null) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi");
+        }
+
+        // Check if call type valid
+        if (session.getType().equals(request.getCallType().toString())) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
+        }
+
+        // Check if user is sender
+        if (session.getCallerId().equals(currentUser.getId())) {
+            throw new BadRequestException("Người gọi không thể từ chối cuộc gọi của mình");
+        }
+
+        // Notify for conversation
+        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi bị từ chối",
+                currentUser.getDisplayName() + " đã từ chối cuộc gọi", NotificationType.CALL_REJECTED);
+
+        // Remove to redis
+        redisService.deleteCallSession(request.getConversationId());
+    }
+
+    @Override
+    public void cancelCall(CallNotificationRequest request) {
         User currentUser = getCurrentUser();
 
         // Check conversation
@@ -135,11 +178,6 @@ public class CallServiceImpl implements CallService {
         redisService.deleteCallSession(request.getConversationId());
     }
 
-    @Override
-    public void cancelCall(CallNotificationRequest request) {
-
-    }
-
     private User getCurrentUser() {
         // Check user
         var context = SecurityContextHolder.getContext();
@@ -151,13 +189,13 @@ public class CallServiceImpl implements CallService {
 
     /**
      * Find a participant in a group or throw exception if not found
+     *
      * @param groupId ID of the group
-     * @param userId ID of the user
-     * @return Participant object if found
+     * @param userId  ID of the user
      * @throws BadRequestException if user is not in the group
      */
-    private Participant findParticipantInGroup(ObjectId groupId, String userId) {
-        return participantRepository.findByConversationIdAndUserId(groupId, userId)
+    private void findParticipantInGroup(ObjectId groupId, String userId) {
+        participantRepository.findByConversationIdAndUserId(groupId, userId)
                 .orElseThrow(() -> new BadRequestException("Người dùng không tồn tại trong nhóm"));
     }
 }

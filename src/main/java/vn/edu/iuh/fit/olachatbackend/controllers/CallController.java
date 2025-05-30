@@ -38,13 +38,12 @@ public class CallController {
                 new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
         );
     }
-//
-//    @PostMapping("/cancel")
-//    public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
-//        redisService.setCallCanceled(req.getConversationId());
-//        notificationService.sendCallCanceledFCM(req);
-//        return ResponseEntity.ok(
-//                new MessageResponse<>(200, "Hủy bỏ gọi điện thành công", true, null)
-//        );
-//    }
+
+    @PostMapping("/cancel")
+    public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
+        callService.cancelCall(req);
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Hủy bỏ gọi điện thành công", true, null)
+        );
+    }
 }

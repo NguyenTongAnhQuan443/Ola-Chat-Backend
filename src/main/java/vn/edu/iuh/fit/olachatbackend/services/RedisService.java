@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import vn.edu.iuh.fit.olachatbackend.dtos.CallSession;
 import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
 import vn.edu.iuh.fit.olachatbackend.enums.CallType;
 
@@ -103,14 +104,28 @@ public class RedisService {
     }
 
     // create call session
-    public void createCallSession(String conversationId, CallType type, Duration ttl) {
+    public void createCallSession(String conversationId, String callerId, CallType type, Duration ttl) {
         String key = CALL_PREFIX + conversationId;
-        redisTemplate.opsForValue().set(key, type.getValue(), ttl);
+
+        try {
+            CallSession session = new CallSession(callerId, type.getValue());
+            String json = objectMapper.writeValueAsString(session);
+            redisTemplate.opsForValue().set(key, json, ttl.getSeconds(), TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create call session", e);
+        }
     }
 
-    public String getCallSession(String conversationId) {
+    public CallSession getCallSession(String conversationId) {
         String key = CALL_PREFIX + conversationId;
-        return redisTemplate.opsForValue().get(key);
+
+        try {
+            String json = redisTemplate.opsForValue().get(key);
+            if (json == null) return null;
+            return objectMapper.readValue(json, CallSession.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse call session", e);
+        }
     }
 
     public void deleteCallSession(String conversationId) {
