@@ -87,6 +87,13 @@ public class CallServiceImpl implements CallService {
 
         // Check if user exists in conversation
         findParticipantInGroup(conversation.getId(), currentUser.getId());
+
+        // Notify for conversation
+        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi được chấp nhận",
+                currentUser.getDisplayName() + " đã trả lời cuộc gọi", NotificationType.CALL_ACCEPTED);
+
+        // Remove to redis
+        redisService.deleteCallSession(request.getConversationId());
     }
 
     @Override
