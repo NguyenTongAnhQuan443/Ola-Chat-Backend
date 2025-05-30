@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.CallNotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.services.CallService;
-import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
-import vn.edu.iuh.fit.olachatbackend.services.RedisService;
 
 @RestController
 @RequestMapping("/api/calls")

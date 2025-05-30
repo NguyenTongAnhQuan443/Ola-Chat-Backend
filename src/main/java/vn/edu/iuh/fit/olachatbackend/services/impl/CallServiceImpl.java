@@ -57,7 +57,7 @@ public class CallServiceImpl implements CallService {
         findParticipantInGroup(conversation.getId(), currentUser.getId());
 
         // Save to redis
-        redisService.createCallSession(request.getConversationId(), Duration.ofSeconds(45));
+        redisService.createCallSession(request.getConversationId(), Duration.ofDays(1));
 
         // Notify for conversation
         notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi đến",
@@ -73,7 +73,7 @@ public class CallServiceImpl implements CallService {
     }
 
     private void handleCallTimeout(String string) {
-
+        System.out.println("Missed call");
     }
 
     @Override
