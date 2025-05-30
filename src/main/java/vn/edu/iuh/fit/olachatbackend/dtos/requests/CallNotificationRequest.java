@@ -1,6 +1,8 @@
 package vn.edu.iuh.fit.olachatbackend.dtos.requests;
 
 import lombok.*;
+import vn.edu.iuh.fit.olachatbackend.enums.CallActionType;
+import vn.edu.iuh.fit.olachatbackend.enums.CallType;
 
 import java.util.Map;
 
@@ -12,12 +14,7 @@ import java.util.Map;
 public class CallNotificationRequest {
     private String title;
     private String body;
-    private String senderId;
-    private String receiverId;
-    private String channelId;
-    private String agoraToken;
-    private String callType; // "VIDEO" | "VOICE"
-    private String token; // FCM token của người nhận
-    private String action; // "OFFER", "ACCEPT", "REJECT", "CANCEL"
-    private Map<String, String> extra; // Thêm data nếu muốn
+    private String conversationId;
+    private CallType callType;
+    private CallActionType callActionType;
 }

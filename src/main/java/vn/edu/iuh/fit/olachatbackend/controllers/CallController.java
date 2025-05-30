@@ -5,21 +5,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.iuh.fit.olachatbackend.dtos.requests.CallNotificationRequest;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
+import vn.edu.iuh.fit.olachatbackend.services.CallService;
 import vn.edu.iuh.fit.olachatbackend.services.NotificationService;
 import vn.edu.iuh.fit.olachatbackend.services.RedisService;
 
 @RestController
 @RequestMapping("/api/calls")
 @RequiredArgsConstructor
-public class CallNotificationController {
+public class CallController {
 
-    private final NotificationService notificationService;
-    private final RedisService redisService;
+    private final CallService callService;
 
     @PostMapping("/invite")
     public ResponseEntity<MessageResponse<Void>> inviteCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallPending(req.getChannelId(), req.getSenderId(), req.getReceiverId(), 45); // Timeout 45s
-        notificationService.sendCallNotification(req); // action mặc định OFFER
+        callService.inviteCall(req);
         return ResponseEntity.ok(
                 new MessageResponse<>(200, "Gửi lời mời gọi điện thành công", true, null)
         );
@@ -27,7 +26,7 @@ public class CallNotificationController {
 
     @PostMapping("/accept")
     public ResponseEntity<MessageResponse<Void>> acceptCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallAccepted(req.getChannelId());
+        redisService.setCallAccepted(req.getConversationId());
         notificationService.sendCallAcceptedFCM(req);
         return ResponseEntity.ok(
                 new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
@@ -36,7 +35,7 @@ public class CallNotificationController {
 
     @PostMapping("/reject")
     public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallRejected(req.getChannelId());
+        redisService.setCallRejected(req.getConversationId());
         notificationService.sendCallRejectedFCM(req);
         return ResponseEntity.ok(
                 new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
@@ -45,7 +44,7 @@ public class CallNotificationController {
 
     @PostMapping("/cancel")
     public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallCanceled(req.getChannelId());
+        redisService.setCallCanceled(req.getConversationId());
         notificationService.sendCallCanceledFCM(req);
         return ResponseEntity.ok(
                 new MessageResponse<>(200, "Hủy bỏ gọi điện thành công", true, null)

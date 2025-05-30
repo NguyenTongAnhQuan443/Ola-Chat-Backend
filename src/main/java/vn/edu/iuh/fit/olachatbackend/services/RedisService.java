@@ -23,7 +23,7 @@ public class RedisService {
     private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     private static final String EMAIL_UPDATE_PREFIX = "email:update:";
     private static final String QR_CODE_PREFIX = "QR:";
-
+    private static final String CALL_PREFIX = "call:session:";
 
     public void saveWhitelistedToken(String jit, String token, long duration, TimeUnit timeUnit) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + jit, token, duration, timeUnit);
@@ -101,44 +101,43 @@ public class RedisService {
         redisTemplate.delete(EMAIL_UPDATE_PREFIX + userId);
     }
 
-    //    Nguyễn Quân
-    private static final String CALL_PREFIX = "call:"; // Key dạng: call:channelId
-
-    // Set trạng thái gọi mới (Pending)
-    public void setCallPending(String channelId, String callerId, String receiverId, long timeoutSeconds) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("status", "PENDING");
-        data.put("callerId", callerId);
-        data.put("receiverId", receiverId);
-        redisTemplate.opsForHash().putAll(CALL_PREFIX + channelId, data);
-        redisTemplate.expire(CALL_PREFIX + channelId, timeoutSeconds, TimeUnit.SECONDS);
+    // create call session
+    public void createCallSession(String conversationId, Duration ttl) {
+        String key = CALL_PREFIX + conversationId;
+        redisTemplate.opsForValue().set(key, "PENDING", ttl);
     }
 
-    // Set trạng thái Accept
-    public void setCallAccepted(String channelId) {
-        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "ACCEPTED");
+    public boolean isCallSession(String conversationId) {
+        String key = CALL_PREFIX + conversationId;
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
-    // Set trạng thái Reject
-    public void setCallRejected(String channelId) {
-        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "REJECTED");
-    }
-
-    // Set trạng thái Cancel
-    public void setCallCanceled(String channelId) {
-        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "CANCELED");
-    }
-
-    // Get trạng thái hiện tại của call
-    public String getCallStatus(String channelId) {
-        Object status = redisTemplate.opsForHash().get(CALL_PREFIX + channelId, "status");
-        return status != null ? status.toString() : null;
-    }
-
-    // Xoá trạng thái cuộc gọi (sau khi xong)
-    public void deleteCall(String channelId) {
-        redisTemplate.delete(CALL_PREFIX + channelId);
-    }
+//
+//    // Set trạng thái Accept
+//    public void setCallAccepted(String channelId) {
+//        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "ACCEPTED");
+//    }
+//
+//    // Set trạng thái Reject
+//    public void setCallRejected(String channelId) {
+//        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "REJECTED");
+//    }
+//
+//    // Set trạng thái Cancel
+//    public void setCallCanceled(String channelId) {
+//        redisTemplate.opsForHash().put(CALL_PREFIX + channelId, "status", "CANCELED");
+//    }
+//
+//    // Get trạng thái hiện tại của call
+//    public String getCallStatus(String channelId) {
+//        Object status = redisTemplate.opsForHash().get(CALL_PREFIX + channelId, "status");
+//        return status != null ? status.toString() : null;
+//    }
+//
+//    // Xoá trạng thái cuộc gọi (sau khi xong)
+//    public void deleteCall(String channelId) {
+//        redisTemplate.delete(CALL_PREFIX + channelId);
+//    }
 
     public void saveQRCodeToken(QrLoginSession session, Duration ttl) throws JsonProcessingException {
         String key = QR_CODE_PREFIX + session.getSessionId();

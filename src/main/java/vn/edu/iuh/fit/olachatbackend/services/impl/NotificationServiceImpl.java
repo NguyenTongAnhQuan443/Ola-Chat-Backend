@@ -276,33 +276,6 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
-    //    Nguyễn Quân
-    @Override
-    public void sendCallNotification(CallNotificationRequest req) {
-        try {
-            Message.Builder builder = Message.builder()
-                    .setToken(req.getToken())
-                    .setNotification(com.google.firebase.messaging.Notification.builder()
-                            .setTitle(req.getTitle())
-                            .setBody(req.getBody())
-                            .build())
-                    .putData("senderId", req.getSenderId())
-                    .putData("receiverId", req.getReceiverId())
-                    .putData("channelId", req.getChannelId())
-                    .putData("agoraToken", req.getAgoraToken() != null ? req.getAgoraToken() : "")
-                    .putData("callType", req.getCallType() != null ? req.getCallType() : "VIDEO")
-                    .putData("action", req.getAction() != null ? req.getAction() : "OFFER");
-            if (req.getExtra() != null) {
-                req.getExtra().forEach(builder::putData);
-            }
-            firebaseMessaging.send(builder.build());
-            logger.info("Sent call notification ({}) to: {}", req.getAction(), req.getToken());
-        } catch (Exception e) {
-            logger.error("Failed to send call notification: {}", e.getMessage());
-            throw new InternalServerErrorException("Error sending call notification: " + e.getMessage());
-        }
-    }
-
     // Tiện dụng cho từng trạng thái (nếu muốn tách rõ hơn)
     @Override
     public void sendCallCanceledFCM(CallNotificationRequest req) {
