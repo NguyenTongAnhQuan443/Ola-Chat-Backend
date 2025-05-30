@@ -108,7 +108,31 @@ public class CallServiceImpl implements CallService {
 
     @Override
     public void rejectCall(CallNotificationRequest request) {
+        User currentUser = getCurrentUser();
 
+        // Check conversation
+        Conversation conversation = conversationRepository.findById(new ObjectId(request.getConversationId()))
+                .orElseThrow(() -> new NotFoundException("Nhóm không tồn tại"));
+
+        // Check if user exists in conversation
+        findParticipantInGroup(conversation.getId(), currentUser.getId());
+
+        // Check if call exists
+        if (redisService.getCallSession(conversation.getId().toString()) == null) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi");
+        }
+
+        // Check if call type valid
+        if (!redisService.getCallSession(conversation.getId().toString()).equals(request.getCallType().toString())) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
+        }
+
+        // Notify for conversation
+        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi bị từ chối",
+                currentUser.getDisplayName() + " đã từ chối cuộc gọi", NotificationType.CALL_REJECTED);
+
+        // Remove to redis
+        redisService.deleteCallSession(request.getConversationId());
     }
 
     @Override

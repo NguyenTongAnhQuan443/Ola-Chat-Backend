@@ -29,15 +29,15 @@ public class CallController {
                 new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
         );
     }
-//
-//    @PostMapping("/reject")
-//    public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {
-//        redisService.setCallRejected(req.getConversationId());
-//        notificationService.sendCallRejectedFCM(req);
-//        return ResponseEntity.ok(
-//                new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
-//        );
-//    }
+
+
+    @PostMapping("/reject")
+    public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {
+        callService.rejectCall(req);
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
+        );
+    }
 //
 //    @PostMapping("/cancel")
 //    public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
