@@ -13,6 +13,7 @@ public interface PostService {
     PostResponse createPost(String content, String privacy, List<Media> mediaList);
     PostResponse getPostById(Long postId);
     UserPostsResponse getUserPosts(int page, int size);
+    List<PostResponse> getUserPosts_v2(int page, int size);
     void deletePostById(Long postId) throws IOException;
     PostResponse updatePost(Long postId, String content, List<String> filesToDelete, List<MultipartFile> newFiles) throws IOException;
     void likePost(Long postId);

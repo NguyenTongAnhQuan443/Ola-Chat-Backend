@@ -71,6 +71,20 @@ public class PostController {
         );
     }
 
+    @GetMapping("/v2")
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserPosts_v2(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        List<PostResponse> postResponses = postService.getUserPosts_v2(page, size);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("User posts retrieved successfully")
+                        .data(postResponses)
+                        .build()
+        );
+    }
+
     @DeleteMapping("/{postId}")
     public ResponseEntity<MessageResponse<String>> deletePost(@PathVariable Long postId) throws IOException {
         postService.deletePostById(postId);
