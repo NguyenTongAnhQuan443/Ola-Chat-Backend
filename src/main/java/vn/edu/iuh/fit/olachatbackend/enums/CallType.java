@@ -4,7 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum CallType {
-    VIDEO("INVITED"), VOICE("VOICE");
+    VIDEO("VIDEO"), VOICE("VOICE");
 
     private final String value;
 

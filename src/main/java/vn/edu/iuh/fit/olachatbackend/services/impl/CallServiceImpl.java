@@ -57,7 +57,7 @@ public class CallServiceImpl implements CallService {
         findParticipantInGroup(conversation.getId(), currentUser.getId());
 
         // Save to redis
-        redisService.createCallSession(request.getConversationId(), Duration.ofDays(1));
+        redisService.createCallSession(request.getConversationId(), request.getCallType(), Duration.ofDays(1));
 
         // Notify for conversation
         notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi đến",
@@ -65,7 +65,7 @@ public class CallServiceImpl implements CallService {
 
         // Schedule
         callTimeoutScheduler.schedule(() -> {
-            if (redisService.isCallSession(conversation.getId().toString())) {
+            if (redisService.getCallSession(conversation.getId().toString()) != null) {
                 handleCallTimeout(conversation.getId().toString());
             }
         }, 45, TimeUnit.SECONDS);
@@ -87,6 +87,16 @@ public class CallServiceImpl implements CallService {
 
         // Check if user exists in conversation
         findParticipantInGroup(conversation.getId(), currentUser.getId());
+
+        // Check if call exists
+        if (redisService.getCallSession(conversation.getId().toString()) == null) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi");
+        }
+
+        // Check if call type valid
+        if (!redisService.getCallSession(conversation.getId().toString()).equals(request.getCallType().toString())) {
+            throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
+        }
 
         // Notify for conversation
         notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi được chấp nhận",

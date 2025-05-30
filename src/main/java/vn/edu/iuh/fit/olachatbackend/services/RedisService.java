@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import vn.edu.iuh.fit.olachatbackend.dtos.QrLoginSession;
+import vn.edu.iuh.fit.olachatbackend.enums.CallType;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -102,14 +103,14 @@ public class RedisService {
     }
 
     // create call session
-    public void createCallSession(String conversationId, Duration ttl) {
+    public void createCallSession(String conversationId, CallType type, Duration ttl) {
         String key = CALL_PREFIX + conversationId;
-        redisTemplate.opsForValue().set(key, "PENDING", ttl);
+        redisTemplate.opsForValue().set(key, type.getValue(), ttl);
     }
 
-    public boolean isCallSession(String conversationId) {
+    public String getCallSession(String conversationId) {
         String key = CALL_PREFIX + conversationId;
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        return redisTemplate.opsForValue().get(key);
     }
 
     public void deleteCallSession(String conversationId) {
