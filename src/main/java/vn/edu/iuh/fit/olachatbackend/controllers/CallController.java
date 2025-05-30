@@ -22,14 +22,13 @@ public class CallController {
         );
     }
 
-//    @PostMapping("/accept")
-//    public ResponseEntity<MessageResponse<Void>> acceptCall(@RequestBody CallNotificationRequest req) {
-//        redisService.setCallAccepted(req.getConversationId());
-//        notificationService.sendCallAcceptedFCM(req);
-//        return ResponseEntity.ok(
-//                new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
-//        );
-//    }
+    @PostMapping("/accept")
+    public ResponseEntity<MessageResponse<Void>> acceptCall(@RequestBody CallNotificationRequest req) {
+        callService.acceptCall(req);
+        return ResponseEntity.ok(
+                new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
+        );
+    }
 //
 //    @PostMapping("/reject")
 //    public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {

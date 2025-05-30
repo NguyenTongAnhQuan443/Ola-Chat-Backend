@@ -112,6 +112,11 @@ public class RedisService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
+    public void deleteCallSession(String conversationId) {
+        String key = CALL_PREFIX + conversationId;
+        redisTemplate.delete(key);
+    }
+
 //
 //    // Set trạng thái Accept
 //    public void setCallAccepted(String channelId) {

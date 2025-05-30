@@ -72,13 +72,21 @@ public class CallServiceImpl implements CallService {
 
     }
 
-    private void handleCallTimeout(String string) {
+    private void handleCallTimeout(String conversationId) {
         System.out.println("Missed call");
+        redisService.deleteCallSession(conversationId);
     }
 
     @Override
     public void acceptCall(CallNotificationRequest request) {
+        User currentUser = getCurrentUser();
 
+        // Check conversation
+        Conversation conversation = conversationRepository.findById(new ObjectId(request.getConversationId()))
+                .orElseThrow(() -> new NotFoundException("Nhóm không tồn tại"));
+
+        // Check if user exists in conversation
+        findParticipantInGroup(conversation.getId(), currentUser.getId());
     }
 
     @Override
