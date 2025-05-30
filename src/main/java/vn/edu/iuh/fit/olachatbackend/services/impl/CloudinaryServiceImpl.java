@@ -288,5 +288,76 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
         return uploadResult.get("url").toString();
     }
+
+    @Override
+    public FileResponse uploadAudioFile(MultipartFile audioFile) throws IOException {
+        // Validate file is audio/mp3
+        String contentType = audioFile.getContentType();
+        if (contentType == null || !contentType.startsWith("audio/")) {
+            throw new IllegalArgumentException("File must be an audio file");
+        }
+
+        var context = SecurityContextHolder.getContext();
+        String currentUsername = context.getAuthentication().getName();
+
+        User user = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Process file name
+        String originalFilename = audioFile.getOriginalFilename();
+        String baseFilename = "audio";
+        String extension = ".mp3";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            int lastDotIndex = originalFilename.lastIndexOf(".");
+            baseFilename = originalFilename.substring(0, lastDotIndex);
+            extension = originalFilename.substring(lastDotIndex);
+        } else if (originalFilename != null) {
+            baseFilename = originalFilename;
+        }
+
+        // Sanitize filename
+        String sanitizedBaseFilename = baseFilename.replaceAll("[^a-zA-Z0-9.\\-_]", "_");
+        String publicId = sanitizedBaseFilename + "--" + UUID.randomUUID();
+
+        // Important: Upload with resource_type=video (Cloudinary uses this for audio files)
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                audioFile.getBytes(),
+                ObjectUtils.asMap(
+                        "resource_type", "video",
+                        "public_id", publicId
+                )
+        );
+
+        String url = uploadResult.get("secure_url").toString();
+        String returnedPublicId = uploadResult.get("public_id").toString();
+
+        // Save to database
+        File fileUpload = File.builder()
+                .fileUrl(url)
+                .fileType(audioFile.getContentType())
+                .fileSize(audioFile.getSize())
+                .uploadedAt(LocalDateTime.now())
+                .uploadedBy(user)
+                .associatedIDMessageId(null)
+                .publicId(returnedPublicId)
+                .resourceType("video") // Cloudinary uses "video" for audio files
+                .originalFileName(originalFilename)
+                .build();
+
+        fileRepository.save(fileUpload);
+
+        // Return response
+        return new FileResponse(
+                fileUpload.getFileId(),
+                fileUpload.getFileUrl(),
+                fileUpload.getFileType(),
+                fileUpload.getFileSize(),
+                fileUpload.getPublicId(),
+                fileUpload.getResourceType(),
+                fileUpload.getOriginalFileName(),
+                fileUpload.getAssociatedIDMessageId()
+        );
+    }
 }
 

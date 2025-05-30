@@ -71,6 +71,20 @@ public class PostController {
         );
     }
 
+    @GetMapping("/v2")
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserPosts_v2(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        List<PostResponse> postResponses = postService.getUserPosts_v2(page, size);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
+                        .message("User posts retrieved successfully")
+                        .data(postResponses)
+                        .build()
+        );
+    }
+
     @DeleteMapping("/{postId}")
     public ResponseEntity<MessageResponse<String>> deletePost(@PathVariable Long postId) throws IOException {
         postService.deletePostById(postId);
@@ -240,6 +254,20 @@ public class PostController {
         UserPostsResponse posts = postService.getUserProfilePosts(userId, page, size);
         return ResponseEntity.ok(
                 MessageResponse.<UserPostsResponse>builder()
+                        .message("User profile posts retrieved successfully")
+                        .data(posts)
+                        .build()
+        );
+    }
+
+    @GetMapping("/user/{userId}/posts_v2")
+    public ResponseEntity<MessageResponse<List<PostResponse>>> getUserProfilePosts_v2(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<PostResponse> posts = postService.getUserProfilePosts_v2(userId, page, size);
+        return ResponseEntity.ok(
+                MessageResponse.<List<PostResponse>>builder()
                         .message("User profile posts retrieved successfully")
                         .data(posts)
                         .build()

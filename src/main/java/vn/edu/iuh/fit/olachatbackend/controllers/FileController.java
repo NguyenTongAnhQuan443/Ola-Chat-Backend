@@ -9,12 +9,15 @@ package vn.edu.iuh.fit.olachatbackend.controllers;/*
  * @version: 1.0
  */
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.FileResponse;
+import vn.edu.iuh.fit.olachatbackend.dtos.responses.MessageResponse;
 import vn.edu.iuh.fit.olachatbackend.dtos.responses.UploadFilesResponse;
 import vn.edu.iuh.fit.olachatbackend.entities.File;
 import vn.edu.iuh.fit.olachatbackend.exceptions.NotFoundException;
@@ -100,6 +103,50 @@ public class FileController {
             @RequestParam("file") MultipartFile file)
             throws IOException {
         return ResponseEntity.ok(cloudinaryService.uploadImage(file));
+    }
+
+    @PostMapping("/upload/audio")
+    public ResponseEntity<MessageResponse<FileResponse>> uploadAudio(
+            @RequestParam("file") MultipartFile file) {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    MessageResponse.<FileResponse>builder()
+                            .statusCode(HttpStatus.BAD_REQUEST.value())
+                            .message("Empty file provided")
+                            .success(false)
+                            .build()
+            );
+        }
+
+        try {
+            FileResponse fileResponse = cloudinaryService.uploadAudioFile(file);
+
+            return ResponseEntity.ok(
+                    MessageResponse.<FileResponse>builder()
+                            .statusCode(HttpStatus.OK.value())
+                            .message("Audio file uploaded successfully")
+                            .success(true)
+                            .data(fileResponse)
+                            .build()
+            );
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(
+                    MessageResponse.<FileResponse>builder()
+                            .statusCode(HttpStatus.BAD_REQUEST.value())
+                            .message(e.getMessage())
+                            .success(false)
+                            .build()
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    MessageResponse.<FileResponse>builder()
+                            .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                            .message("Failed to upload audio: " + e.getMessage())
+                            .success(false)
+                            .build()
+            );
+        }
     }
 
 

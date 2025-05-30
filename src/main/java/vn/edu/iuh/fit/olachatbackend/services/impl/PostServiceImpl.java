@@ -181,6 +181,40 @@ public class PostServiceImpl implements PostService {
         );
     }
 
+    @Override
+    public List<PostResponse> getUserPosts_v2(int page, int size) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> postPage = postRepository.findByCreatedBy(currentUser, pageable);
+
+        return postPage.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null);
+                }
+            }
+
+            // Use the postMapper to directly convert to PostResponse
+            return postMapper.toPostResponse(post);
+        }).collect(Collectors.toList());
+    }
+
     @Transactional
     public void deletePostById(Long postId) throws IOException {
         Post post = postRepository.findById(postId)
@@ -735,6 +769,59 @@ public class PostServiceImpl implements PostService {
                 posts.getNumber() + 1,
                 posts.getSize()
         );
+    }
+
+    @Override
+    public List<PostResponse> getUserProfilePosts_v2(String userId, int page, int size) {
+        // Lấy người dùng hiện tại
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Lấy người dùng được truy cập
+        User profileUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
+
+        // Kiểm tra mối quan hệ bạn bè
+        boolean isFriend = friendRepository.findByUserIdAndFriendId(currentUser.getId(), profileUser.getId())
+                .or(() -> friendRepository.findByUserIdAndFriendId(profileUser.getId(), currentUser.getId()))
+                .isPresent();
+
+        // Lấy danh sách bài đăng dựa trên quyền riêng tư
+        Page<Post> posts;
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (currentUser.equals(profileUser)) {
+            posts = postRepository.findByCreatedBy(profileUser, pageRequest);
+        } else if (isFriend) {
+            posts = postRepository.findByCreatedByAndPrivacyIn(profileUser, List.of(Privacy.PUBLIC, Privacy.FRIENDS), pageRequest);
+        } else {
+            posts = postRepository.findByCreatedByAndPrivacy(profileUser, Privacy.PUBLIC, pageRequest);
+        }
+
+        // Map sang PostResponse thay vì UserPostOnlyResponse
+        return posts.stream().map(post -> {
+            Post originalPost = post.getOriginalPost();
+
+            if (originalPost != null) {
+                boolean canViewOriginal = true;
+
+                if (originalPost.getPrivacy() == Privacy.PRIVATE &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                } else if (originalPost.getPrivacy() == Privacy.FRIENDS &&
+                        !isFriend(originalPost.getCreatedBy(), currentUser) &&
+                        !originalPost.getCreatedBy().equals(currentUser)) {
+                    canViewOriginal = false;
+                }
+
+                if (!canViewOriginal) {
+                    post.setOriginalPost(null); // Ẩn chi tiết bài gốc
+                }
+            }
+
+            // Sử dụng postMapper.toPostResponse thay vì toUserPostOnlyResponse
+            return postMapper.toPostResponse(post);
+        }).toList();
     }
 
     @Override
