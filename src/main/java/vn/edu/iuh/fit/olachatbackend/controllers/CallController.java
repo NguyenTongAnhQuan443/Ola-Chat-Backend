@@ -24,30 +24,30 @@ public class CallController {
         );
     }
 
-    @PostMapping("/accept")
-    public ResponseEntity<MessageResponse<Void>> acceptCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallAccepted(req.getConversationId());
-        notificationService.sendCallAcceptedFCM(req);
-        return ResponseEntity.ok(
-                new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
-        );
-    }
-
-    @PostMapping("/reject")
-    public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallRejected(req.getConversationId());
-        notificationService.sendCallRejectedFCM(req);
-        return ResponseEntity.ok(
-                new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
-        );
-    }
-
-    @PostMapping("/cancel")
-    public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
-        redisService.setCallCanceled(req.getConversationId());
-        notificationService.sendCallCanceledFCM(req);
-        return ResponseEntity.ok(
-                new MessageResponse<>(200, "Hủy bỏ gọi điện thành công", true, null)
-        );
-    }
+//    @PostMapping("/accept")
+//    public ResponseEntity<MessageResponse<Void>> acceptCall(@RequestBody CallNotificationRequest req) {
+//        redisService.setCallAccepted(req.getConversationId());
+//        notificationService.sendCallAcceptedFCM(req);
+//        return ResponseEntity.ok(
+//                new MessageResponse<>(200, "Chấp nhận gọi điện thành công", true, null)
+//        );
+//    }
+//
+//    @PostMapping("/reject")
+//    public ResponseEntity<MessageResponse<Void>> rejectCall(@RequestBody CallNotificationRequest req) {
+//        redisService.setCallRejected(req.getConversationId());
+//        notificationService.sendCallRejectedFCM(req);
+//        return ResponseEntity.ok(
+//                new MessageResponse<>(200, "Từ chối gọi điện thành công", true, null)
+//        );
+//    }
+//
+//    @PostMapping("/cancel")
+//    public ResponseEntity<MessageResponse<Void>> cancelCall(@RequestBody CallNotificationRequest req) {
+//        redisService.setCallCanceled(req.getConversationId());
+//        notificationService.sendCallCanceledFCM(req);
+//        return ResponseEntity.ok(
+//                new MessageResponse<>(200, "Hủy bỏ gọi điện thành công", true, null)
+//        );
+//    }
 }

@@ -276,30 +276,30 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
-    // Tiện dụng cho từng trạng thái (nếu muốn tách rõ hơn)
-    @Override
-    public void sendCallCanceledFCM(CallNotificationRequest req) {
-        req.setAction("CANCEL");
-        req.setTitle("Cuộc gọi bị huỷ");
-        req.setBody("Đối phương đã huỷ cuộc gọi.");
-        sendCallNotification(req);
-    }
-
-    @Override
-    public void sendCallAcceptedFCM(CallNotificationRequest req) {
-        req.setAction("ACCEPT");
-        req.setTitle("Cuộc gọi được chấp nhận");
-        req.setBody("Đối phương đã trả lời cuộc gọi.");
-        sendCallNotification(req);
-    }
-
-    @Override
-    public void sendCallRejectedFCM(CallNotificationRequest req) {
-        req.setAction("REJECT");
-        req.setTitle("Cuộc gọi bị từ chối");
-        req.setBody("Đối phương đã từ chối cuộc gọi.");
-        sendCallNotification(req);
-    }
+//    // Tiện dụng cho từng trạng thái (nếu muốn tách rõ hơn)
+//    @Override
+//    public void sendCallCanceledFCM(CallNotificationRequest req) {
+//        req.setAction("CANCEL");
+//        req.setTitle("Cuộc gọi bị huỷ");
+//        req.setBody("Đối phương đã huỷ cuộc gọi.");
+//        sendCallNotification(req);
+//    }
+//
+//    @Override
+//    public void sendCallAcceptedFCM(CallNotificationRequest req) {
+//        req.setAction("ACCEPT");
+//        req.setTitle("Cuộc gọi được chấp nhận");
+//        req.setBody("Đối phương đã trả lời cuộc gọi.");
+//        sendCallNotification(req);
+//    }
+//
+//    @Override
+//    public void sendCallRejectedFCM(CallNotificationRequest req) {
+//        req.setAction("REJECT");
+//        req.setTitle("Cuộc gọi bị từ chối");
+//        req.setBody("Đối phương đã từ chối cuộc gọi.");
+//        sendCallNotification(req);
+//    }
 
 }
 
