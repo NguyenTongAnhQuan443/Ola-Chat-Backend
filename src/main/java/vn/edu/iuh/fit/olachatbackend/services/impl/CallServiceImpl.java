@@ -96,9 +96,12 @@ public class CallServiceImpl implements CallService {
         }
 
         // Check if call type valid
-        if (session.getType().equals(request.getCallType().toString())) {
+        if (!session.getType().equals(request.getCallType().toString())) {
             throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
         }
+
+        System.out.println("Sender: " + session.getCallerId());
+        System.out.println("Current: "+ currentUser.getId());
 
         // Check if user is sender
         if (session.getCallerId().equals(currentUser.getId())) {
@@ -132,7 +135,7 @@ public class CallServiceImpl implements CallService {
         }
 
         // Check if call type valid
-        if (session.getType().equals(request.getCallType().toString())) {
+        if (!session.getType().equals(request.getCallType().toString())) {
             throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
         }
 
@@ -160,19 +163,26 @@ public class CallServiceImpl implements CallService {
         // Check if user exists in conversation
         findParticipantInGroup(conversation.getId(), currentUser.getId());
 
+        CallSession session = redisService.getCallSession(conversation.getId().toString());
+
         // Check if call exists
-        if (redisService.getCallSession(conversation.getId().toString()) == null) {
+        if (session == null) {
             throw new NotFoundException("Không tìm thấy cuộc gọi");
         }
 
         // Check if call type valid
-        if (!redisService.getCallSession(conversation.getId().toString()).equals(request.getCallType().toString())) {
+        if (!session.getType().equals(request.getCallType().toString())) {
             throw new NotFoundException("Không tìm thấy cuộc gọi " + request.getCallType().toString());
         }
 
+        // Check if user is sender
+        if (!session.getCallerId().equals(currentUser.getId())) {
+            throw new BadRequestException("Chỉ người gọi mới được hủy bỏ cuộc gọi");
+        }
+
         // Notify for conversation
-        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi bị từ chối",
-                currentUser.getDisplayName() + " đã từ chối cuộc gọi", NotificationType.CALL_REJECTED);
+        notificationService.notifyConversation(conversation.getId().toString(), currentUser.getId(), "Cuộc gọi nhỡ",
+                "Bạn đã bỏ lỡ cuộc gọi từ " + currentUser.getDisplayName() , NotificationType.CALL_MISSED);
 
         // Remove to redis
         redisService.deleteCallSession(request.getConversationId());
